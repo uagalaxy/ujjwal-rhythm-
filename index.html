@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Daily Rhythm & Quiz App</title>
+    
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#000000" id="theme-color-meta">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <link rel="stylesheet" href="styles.css">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+
+    <div class="oneui-header-container">
+        <div class="top-nav">
+            <div>
+                <h1 id="oneui-app-title" class="oneui-main-title">Routine</h1>
+                <div id="date-day-header" class="date-day-header"></div>
+            </div>
+            <div class="user-controls">
+                <button id="theme-toggle-btn" class="icon-btn" title="Toggle Light/Dark Mode"><i class="fas fa-sun"></i></button>
+                <button id="settings-btn" class="icon-btn" style="display: none;" title="API Key Settings"><i class="fas fa-key"></i></button>
+                <img id="user-avatar" src="" alt="Profile" style="display: none;">
+                <button id="logout-btn" class="icon-btn danger-text" style="display: none;" title="Logout"><i class="fas fa-sign-out-alt"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <div id="login-section" class="content-section active">
+        <div class="glass-panel text-center" style="text-align: center; padding: 40px 20px;">
+            <i class="fab fa-google" style="font-size: 3rem; color: var(--accent-color); margin-bottom: 20px;"></i>
+            <h2 style="margin-top:0;">Welcome Back</h2>
+            <p style="color: var(--text-muted); margin-bottom: 30px;">Sign in to sync your routines and access personalized quizzes.</p>
+            <button id="google-login-btn" class="primary" style="margin: 0 auto;">Sign in with Google</button>
+        </div>
+    </div>
+
+    <div id="activity-section" class="content-section">
+        <div class="chart-container">
+            <svg id="schedule-chart" class="chart" viewBox="0 0 100 100"></svg>
+            <div id="center-activity-label" class="center-activity-label">No Active Routine</div>
+        </div>
+
+        <div class="glass-panel">
+            <div class="timeline-wrapper">
+                <div id="timeline-container"></div>
+            </div>
+            <button type="button" class="primary" id="add-activity-button" style="margin: 0 auto; display: inline-flex;">
+                <i class="fas fa-plus-circle"></i> Add New Activity
+            </button>
+        </div>
+    </div>
+
+    <div id="quiz-section" class="content-section">
+        <div id="landingPage" class="glass-panel quiz-welcome-panel">
+            <h2>Master Any Subject! 🚀</h2>
+            <p>Create personalized quizzes effortlessly. Test your knowledge and track your results offline.</p>
+            <button id="startQuizBtn" class="primary w-full" style="margin-top: 15px;">
+                <i class="fas fa-magic"></i> Create Quiz
+            </button>
+        </div>
+
+        <div id="loadingIndicator" style="display:none; text-align:center; width:100%;">
+            <div class="loader-ring"></div>
+            <p>Generating your quiz...</p>
+        </div>
+
+        <div id="quizContainer" class="glass-panel" style="display: none; background: rgba(255,255,255,0.02);"></div>
+
+        <div id="resultsContainer" class="results-panel glass-panel">
+            <h3>Quiz Results</h3>
+            <p id="scoreText" style="font-size: 1.1rem; margin: 5px 0;"></p>
+            <p id="timeText" style="font-size: 0.95rem; color: var(--text-muted); margin: 0;"></p>
+        </div>
+
+        <div id="controls" class="glass-panel" style="display: none; padding: 20px;">
+            <div class="button-group" style="margin: 0;">
+                <button id="submitBtn" class="primary flex-1">Submit Test</button>
+                <button id="downloadPdfBtn" class="secondary flex-1"><i class="fas fa-file-pdf"></i> Save PDF</button>
+                <button id="resetQuizBtn" class="danger flex-1">Reset</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="activity-modal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="modal-close-button" id="modal-close-button">&times;</button>
+            <h2 id="form-title" style="margin-top:0; margin-bottom:1.5rem; font-size:1.4rem;">Add New Activity</h2>
+            <form id="activity-form">
+                <input type="hidden" id="activity-id">
+                <div class="form-group">
+                    <label for="activity-label">Activity Name:</label>
+                    <input type="text" id="activity-label" placeholder="e.g., Work, Sleep, Gym" required>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label for="start-time">Start Time:</label>
+                        <input type="time" id="start-time" required>
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label for="end-time">End Time:</label>
+                        <input type="time" id="end-time" required>
+                    </div>
+                </div>
+                <div class="button-group">
+                    <button type="submit" class="primary" id="save-button">Add Activity</button>
+                    <button type="button" class="secondary" id="cancel-edit-button">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="inputModal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="modal-close-button" id="closeQuizConfigBtn">&times;</button>
+            <h2 style="margin-top: 0; margin-bottom: 1.5rem; font-size: 1.4rem;">Setup Quiz</h2>
+            <div class="form-group">
+                <label for="modalTopicInput">Quiz Topic:</label>
+                <input type="text" id="modalTopicInput" placeholder="e.g., Quantum Mechanics, European History" required>
+            </div>
+            <div style="display: flex; gap: 10px; margin-bottom: 1.25rem;">
+                <div class="form-group" style="flex: 1; margin: 0;">
+                    <label for="modalDifficultySelect">Difficulty Level:</label>
+                    <select id="modalDifficultySelect">
+                        <option value="easy">Easy</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="hard">Hard</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 1; margin: 0;">
+                    <label for="modalNumQuestionsSelect">Total Questions:</label>
+                    <select id="modalNumQuestionsSelect">
+                        <option value="5" selected>5 Questions</option>
+                        <option value="10">10 Questions</option>
+                        <option value="20">20 Questions</option>
+                    </select>
+                </div>
+            </div>
+            <button id="generateBtn" class="primary w-full"><i class="fas fa-cog"></i> Generate Questions</button>
+        </div>
+    </div>
+
+    <div id="api-key-modal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="modal-close-button" id="close-api-key-btn">&times;</button>
+            <h2 style="margin-top: 0; margin-bottom: 1.5rem; font-size: 1.4rem;">Gemini API Key</h2>
+            <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 15px;">Enter your Google Gemini API key to enable personalized quiz generation.</p>
+            <div class="form-group">
+                <label for="gemini-api-key-input">API Key:</label>
+                <input type="password" id="gemini-api-key-input" placeholder="AIzaSy..." required>
+            </div>
+            <button id="save-api-key-btn" class="primary w-full">Save Key</button>
+        </div>
+    </div>
+
+    <div id="arc-info-tooltip" class="arc-info-tooltip">
+        <div class="info-label"></div>
+        <div class="info-time"></div>
+    </div>
+
+    <div id="floatingTimerControls" class="timer-badge">
+        <span id="timer"><i class="far fa-clock"></i> 00:00</span>
+        <button id="pauseBtn" class="secondary"><i class="fas fa-pause"></i> pause</button>
+    </div>
+
+    <div id="quizOverlay" class="quiz-overlay">
+        <span>Test paused</span>
+        <button id="overlayResumeBtn" class="primary"><i class="fas fa-play"></i> Resume Quiz</button>
+    </div>
+
+    <div id="progressWrapper" class="hud-progress-container">
+        <div id="progressBarFill" class="hud-progress-bar"></div>
+    </div>
+
+    <div id="hud-toast"></div>
+
+    <div class="tab-bar-container" id="main-tabs" style="display: none;">
+        <button id="activity-tab-btn" class="tab-button active"><i class="fas fa-chart-pie"></i> Routine</button>
+        <button id="quiz-tab-btn" class="tab-button"><i class="fas fa-graduation-cap"></i> Quiz</button>
+    </div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>
+
