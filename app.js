@@ -379,12 +379,8 @@ function updateActiveRoutineBar() {
     }
 
     if (activeRoutine) {
-        const curAngle = timeToAngle(curH, curM);
-        activeBar.setAttribute('d', describeArc(cx, cy, radius, curAngle - 0.2, curAngle + 0.2));
         activeBar.style.display = 'block'; centerActivityLabel.textContent = activeRoutine.label;
     } else {
-       activeBar.setAttribute('d', describeArc(cx, cy, radius, curAngle - 0.2, curAngle + 0.2));
-        
         activeBar.style.display = 'none'; centerActivityLabel.textContent = "No Active Routine"; 
     }
 
