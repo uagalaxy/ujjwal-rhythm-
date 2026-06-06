@@ -377,7 +377,9 @@ function updateActiveRoutineBar() {
             break;
         }
     }
-
+const curAngle = timeToAngle(curH, curM);
+      arc.setAttribute('d', describeArc(cx, cy, radius, curAngle - 0.2, curAngle + 0.2));
+        
     if (activeRoutine) {
         activeBar.style.display = 'block'; centerActivityLabel.textContent = activeRoutine.label;
     } else {
