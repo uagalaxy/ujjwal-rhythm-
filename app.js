@@ -1,7 +1,8 @@
 // --- Firebase v10 Modular SDK Imports ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { getDatabase, ref, set, onValue, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+// Added 'remove' to handle specific activity deletions
+import { getDatabase, ref, set, onValue, get, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
 
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
@@ -161,25 +162,24 @@ saveApiKeyBtn.onclick = () => {
     }
 };
 
-// --- Routine Firebase Syncing ---
+// --- Routine Firebase Syncing (Updated Logic) ---
 function syncRoutines() {
     const routinesRef = ref(db, `users/${currentUser.uid}/routines`);
+    
     onValue(routinesRef, (snapshot) => {
         if (snapshot.exists()) {
             const data = snapshot.val();
-            // Force data into an array so .forEach() never crashes
-            currentScheduleData = Array.isArray(data) ? data : Object.values(data);
+            // Convert dictionary to array safely
+            currentScheduleData = Object.values(data);
+            // Sort chronologically for table display
+            currentScheduleData.sort((a,b) => (a.startH * 60 + a.startM) - (b.startH * 60 + b.startM));
         } else {
             currentScheduleData = [];
         }
+        // Redraw UI automatically based on realtime data
         drawChart();
         createScheduleTable();
     });
-}
-
-function saveRoutinesToDB() {
-    if(!currentUser) return;
-    set(ref(db, `users/${currentUser.uid}/routines`), currentScheduleData);
 }
 
 // --- Notifications (FCM & Local) ---
@@ -464,11 +464,16 @@ function editActivity(item) {
     activityModal.classList.add('show');
 }
 
+// --- Delete Logic (Updated) ---
 function deleteActivity(id) {
     if(confirm("Delete this activity?")) {
-        currentScheduleData = currentScheduleData.filter(i => i.id !== id);
-        saveRoutinesToDB(); 
-        drawChart(); createScheduleTable(); triggerHUDToast("Activity deleted.");
+        const routineRef = ref(db, `users/${currentUser.uid}/routines/${id}`);
+        remove(routineRef).then(() => {
+            triggerHUDToast("Activity deleted.");
+        }).catch((error) => {
+            console.error("Delete error:", error);
+            triggerHUDToast("Error deleting activity.");
+        });
     }
 }
 
@@ -479,9 +484,13 @@ addActivityButton.onclick = () => {
 };
 cancelEditButton.onclick = () => activityModal.classList.remove('show');
 
-// Fixed Form Submission Event (prevents page refresh completely)
+// --- Form Submission Logic (Updated) ---
 activityForm.addEventListener('submit', (e) => {
     e.preventDefault(); 
+    if(!currentUser) {
+        triggerHUDToast("Please log in to save activities.");
+        return;
+    }
 
     try {
         const id = activityIdInput.value || generateUniqueId();
@@ -493,25 +502,22 @@ activityForm.addEventListener('submit', (e) => {
         
         const existing = currentScheduleData.find(i => i.id === id);
         const color = existing ? existing.color : getRandomLightColor();
+        
         const packed = { id, label, startH, startM, endH, endM, color };
 
-        if(existing) { 
-            const idx = currentScheduleData.findIndex(i => i.id === id); 
-            currentScheduleData[idx] = packed; 
-        } else { 
-            currentScheduleData.push(packed); 
-        }
-
-        currentScheduleData.sort((a,b) => (a.startH * 60 + a.startM) - (b.startH * 60 + b.startM));
-        saveRoutinesToDB(); 
+        const routineRef = ref(db, `users/${currentUser.uid}/routines/${id}`);
         
-        drawChart(); 
-        createScheduleTable(); 
-        activityModal.classList.remove('show'); 
-        triggerHUDToast("Activity saved.");
+        set(routineRef, packed).then(() => {
+            activityModal.classList.remove('show'); 
+            triggerHUDToast("Activity saved.");
+        }).catch((error) => {
+            console.error("Firebase save error:", error);
+            triggerHUDToast("Failed to save activity.");
+        });
+
     } catch (error) {
         console.error("Form parsing error:", error);
-        triggerHUDToast("Failed to save activity.");
+        triggerHUDToast("Failed to parse activity.");
     }
 });
 
@@ -549,7 +555,6 @@ startQuizBtn.onclick = () => {
 }
 closeQuizConfigBtn.onclick = () => inputModal.classList.remove('show');
 
-// Fixed Gemini API Call logic using responseSchema
 generateBtn.addEventListener('click', async () => {
     const topic = document.getElementById('modalTopicInput').value.trim();
     const difficulty = document.getElementById('modalDifficultySelect').value || 'medium';
@@ -865,3 +870,4 @@ document.addEventListener('DOMContentLoaded', () => {
     loadQuizFromLocalStorage();
     document.addEventListener('click', () => { document.querySelectorAll('.action-menu-dropdown.show').forEach(d => d.classList.remove('show')); });
 });
+
