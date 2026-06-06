@@ -534,13 +534,18 @@ function switchTab(target) {
     activitySection.classList.remove('active'); 
     quizSection.classList.remove('active');
     
+    // Explicitly handle display styles to prevent both showing simultaneously
     if(target === 'activity') { 
         activityTabBtn.classList.add('active'); 
         activitySection.classList.add('active'); 
+        activitySection.style.display = 'block'; // Force show
+        quizSection.style.display = 'none';      // Force hide
         appTitle.textContent = "Routine";
     } else { 
         quizTabBtn.classList.add('active'); 
         quizSection.classList.add('active'); 
+        quizSection.style.display = 'block';     // Force show
+        activitySection.style.display = 'none';  // Force hide
         appTitle.textContent = "Quiz practice";
     }
 }
