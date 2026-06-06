@@ -110,29 +110,87 @@ body {
     gap: 10px;
 }
 
-.icon-btn {
-    background: var(--button-bg-secondary);
-    color: var(--text-color);
-    border: none;
+.profile-menu-wrapper {
+    position: relative;
+}
+
+.profile-trigger {
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
-    width: 40px;
-    height: 40px;
+    background: var(--button-bg-secondary);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer !important;
     transition: background 0.2s;
+    color: var(--text-color);
+    font-size: 1.5rem;
 }
-.icon-btn:hover {
+
+.profile-trigger:hover {
     background: var(--button-hover-bg-secondary);
 }
 
-#user-avatar {
-    width: 40px;
-    height: 40px;
+.profile-trigger img {
+    width: 100%;
+    height: 100%;
     border-radius: 50%;
     object-fit: cover;
     border: 2px solid var(--border-color);
+    display: none; /* Controlled by JS when user logs in */
+}
+
+/* User Menu Dropdown Styling */
+.profile-dropdown {
+    position: absolute; 
+    top: calc(100% + 10px); 
+    right: 0; 
+    background: var(--bg-color); 
+    backdrop-filter: blur(25px);
+    border: 1px solid var(--border-color); 
+    border-radius: 16px; 
+    padding: 8px; 
+    display: none; /* Toggled by .show class */
+    flex-direction: column; 
+    gap: 4px; 
+    min-width: 160px; 
+    z-index: 2000; 
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+}
+
+.profile-dropdown.show { 
+    display: flex; 
+}
+
+.profile-dropdown button {
+    background: transparent; 
+    border: none; 
+    padding: 12px 14px; 
+    text-align: left; 
+    width: 100%;
+    border-radius: 12px; 
+    font-size: 0.9rem; 
+    color: var(--text-color);
+    display: flex;
+    justify-content: flex-start;
+}
+
+.profile-dropdown button i {
+    width: 20px;
+    margin-right: 10px;
+    text-align: center;
+}
+
+.profile-dropdown button:hover { 
+    background: var(--button-bg-secondary); 
+}
+.profile-dropdown button.delete-btn { 
+    color: var(--danger-text); 
+}
+.profile-dropdown button.delete-btn:hover { 
+    background: var(--danger-hover-bg); 
+    color: #ffffff; 
 }
 
 .date-day-header {
@@ -287,7 +345,17 @@ svg.chart {
     outline: none; border-color: var(--accent-color); box-shadow: 0 0 0 3px rgba(62, 145, 255, 0.2);
 }
 
-.button-group { display: flex; gap: 10px; margin-top: 1.5rem; }
+/* Modals Vertical Button Layout */
+.button-group-vertical {
+    display: flex; 
+    flex-direction: column; 
+    gap: 12px; 
+    margin-top: 1.5rem; 
+}
+.w-full {
+    width: 100%;
+}
+
 button {
     padding: 14px 22px; border: none; border-radius: 24px; font-family: var(--body-font); font-size: 0.95rem;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); font-weight: 600; display: inline-flex;
@@ -313,11 +381,6 @@ button:disabled { opacity: 0.4; transform: none !important; }
     transform: translateY(-30px); transition: transform 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28); text-align: left;
 }
 .modal-overlay.show .modal-content { transform: translateY(0); }
-.modal-close-button {
-    position: absolute; top: 20px; right: 25px; font-size: 1.8rem; color: var(--text-muted);
-    background: none; border: none; padding: 0; transition: color 0.2s;
-}
-.modal-close-button:hover { color: var(--text-color); }
 
 .arc-info-tooltip {
     position: fixed; background-color: var(--bg-color); color: var(--text-color); backdrop-filter: blur(25px);
@@ -418,8 +481,7 @@ button:disabled { opacity: 0.4; transform: none !important; }
 @media (max-width: 600px) {
     body { padding: 12px; padding-bottom: 100px; }
     .glass-panel { padding: 20px; }
-    .button-group { flex-direction: column; }
-    button { width: 100%; }
+    .button-group-vertical { flex-direction: column; }
     .tab-bar-container { width: calc(100% - 24px); }
 }
  
