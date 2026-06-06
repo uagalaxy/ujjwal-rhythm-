@@ -198,17 +198,26 @@
 
     <script type="module" src="app.js"></script>
     <script>
-        // Simple script to toggle the new profile dropdown menu 
-        document.getElementById('profile-trigger').addEventListener('click', function() {
-            document.getElementById('profile-dropdown').classList.toggle('show');
-        });
 
-        // Close dropdown when clicking outside
-        window.addEventListener('click', function(e) {
-            if (!document.querySelector('.profile-menu-wrapper').contains(e.target)) {
-                document.getElementById('profile-dropdown').classList.remove('show');
-            }
-        });
+        // --- Profile Dropdown Logic ---
+const profileTrigger = document.getElementById('profile-trigger');
+const profileDropdown = document.getElementById('profile-dropdown');
+const profileWrapper = document.querySelector('.profile-menu-wrapper');
+
+// Toggle dropdown when clicking the trigger
+profileTrigger.addEventListener('click', function(e) {
+    // 1. Stop the event from bubbling up to the window
+    e.stopPropagation(); 
+    profileDropdown.classList.toggle('show');
+});
+
+// Close dropdown when clicking anywhere else on the window
+window.addEventListener('click', function(e) {
+    // 2. Check if the click target is outside the wrapper
+    if (profileWrapper && !profileWrapper.contains(e.target)) {
+        profileDropdown.classList.remove('show');
+    }
+});
     </script>
 </body>
 </html>
