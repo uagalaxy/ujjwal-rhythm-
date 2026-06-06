@@ -587,7 +587,7 @@ Provide the output as a JSON array of objects. Each object should have 'question
     };
 
     try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${userGeminiApiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${userGeminiApiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -632,7 +632,7 @@ Provide the output as a JSON array of objects. Each object should have 'question
 });
 
 function renderQuizStructure() {
-    quizContainer.innerHTML = `<h2>Quiz Workspace</h2>`;
+    quizContainer.innerHTML = `<h2>Questions ready!</h2>`;
     quizState.activeQuestions.forEach((q, idx) => {
         const card = document.createElement('div');
         card.className = 'question-card';
