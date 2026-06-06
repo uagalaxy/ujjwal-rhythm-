@@ -2,7 +2,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { getDatabase, ref, set, onValue, get, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
 
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
@@ -21,21 +20,12 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
 
-// Attempt Messaging setup (Catch errors if running on local file protocol)
-let messaging;
-try {
-    messaging = getMessaging(app);
-} catch (e) {
-    console.warn("Firebase Messaging not supported or setup properly:", e);
-}
-
 // --- Global App State ---
 const LOCAL_STORAGE_KEY_QUIZ = 'dailyRhythmSelfQuizState';
 let currentScheduleData = [];
 let activeRoutineBarInterval;
 let currentUser = null;
 let userGeminiApiKey = null;
-let notifiedRoutines = {}; 
 let routinesUnsubscribe = null; 
 
 // --- Theme Management ---
@@ -88,12 +78,10 @@ googleLoginBtn.addEventListener('click', () => {
 
 logoutBtn.addEventListener('click', () => {
     signOut(auth).then(() => {
-        // Kill the realtime listener
         if (routinesUnsubscribe) {
             routinesUnsubscribe();
             routinesUnsubscribe = null;
         }
-
         resetQuizEnv();
         currentScheduleData = [];
         drawChart();
@@ -104,7 +92,6 @@ logoutBtn.addEventListener('click', () => {
 onAuthStateChanged(auth, (user) => {
     if (user) {
         currentUser = user;
-        // Update UI
         loginSection.classList.remove('active');
         activitySection.classList.add('active');
         mainTabs.style.display = 'flex';
@@ -116,13 +103,8 @@ onAuthStateChanged(auth, (user) => {
         
         triggerHUDToast(`Welcome, ${user.displayName.split(' ')[0]}!`);
         
-        // Sync routines
         syncRoutines();
-        // Load API Key
         fetchGeminiKey();
-        // Request Notification Perms
-        requestNotificationPermissions();
-        
     } else {
         currentUser = null;
         userGeminiApiKey = null;
@@ -168,60 +150,32 @@ saveApiKeyBtn.onclick = () => {
     }
 };
 
-// --- Routine Firebase Syncing (Updated Logic) ---
+// --- Routine Firebase Syncing ---
 function syncRoutines() {
-    // 1. Detach any existing listener before creating a new one
     if (routinesUnsubscribe) {
         routinesUnsubscribe();
     }
 
     const routinesRef = ref(db, `users/${currentUser.uid}/routines`);
     
-    // 2. Save the un-subscriber function
     routinesUnsubscribe = onValue(routinesRef, (snapshot) => {
         if (snapshot.exists()) {
             const data = snapshot.val();
-            
-            // 3. Convert dictionary to array safely AND filter out any null/corrupt items
             currentScheduleData = Object.values(data).filter(item => item && typeof item === 'object' && item.id);
-            
-            // Sort chronologically for table display
             currentScheduleData.sort((a,b) => (a.startH * 60 + a.startM) - (b.startH * 60 + b.startM));
         } else {
             currentScheduleData = [];
         }
         
-        // Redraw UI automatically based on realtime data
         createScheduleTable();
         drawChart();
-        
     });
-}
-
-// --- Notifications (FCM & Local) ---
-function requestNotificationPermissions() {
-    if ("Notification" in window) {
-        Notification.requestPermission().then((permission) => {
-            if (permission === "granted" && messaging) {
-                console.log("Notification permission granted.");
-            }
-        });
-    }
-}
-
-function triggerLocalNotification(title, body) {
-    if ("Notification" in window && Notification.permission === "granted") {
-        new Notification(title, {
-            body: body,
-            icon: 'https://placehold.co/400x400/EEE/31343C?font=playfair-display&text=R' 
-        });
-    }
 }
 
 // --- SVG & Chart Variables ---
 const svgNS = "http://www.w3.org/2000/svg";
 const cx = 50; const cy = 50; const radius = 45;
-const strokeWidth = 9; const activeBarStrokeWidth = 7;
+const strokeWidth = 9;
 
 const appTitle = document.getElementById('oneui-app-title');
 const dateDayHeader = document.getElementById('date-day-header');
@@ -282,12 +236,14 @@ function generateUniqueId() { return Date.now().toString(36) + Math.random().toS
 function getRandomLightColor() { const hue = Math.floor(Math.random() * 360); return `hsl(${hue}, 75%, 70%)`; }
 function triggerHUDToast(msg) {
     const el = document.getElementById('hud-toast');
-    el.textContent = msg; el.classList.add('show');
-    setTimeout(() => el.classList.remove('show'), 3500);
+    if(el) {
+        el.textContent = msg; el.classList.add('show');
+        setTimeout(() => el.classList.remove('show'), 3500);
+    }
 }
 
 function polarToCartesian(centerX, centerY, r, angleInDegrees) {
-    const angleInRadians = angleInDegrees * Math.PI / 180.0;
+    const angleInRadians = (angleInDegrees - 90) * Math.PI / 180.0; // Corrected offset to make 12:00 AM straight up
     return { x: centerX + (r * Math.cos(angleInRadians)), y: centerY + (r * Math.sin(angleInRadians)) };
 }
 
@@ -332,12 +288,18 @@ function drawChart() {
         svgChart.appendChild(arc);
     });
 
-    const activeBar = document.createElementNS(svgNS, 'path');
-    activeBar.setAttribute('id', 'active-routine-bar'); activeBar.setAttribute('class', 'active-routine-arc');
-    activeBar.setAttribute('stroke-width', activeBarStrokeWidth); svgChart.appendChild(activeBar);
+    // Time Indicator Circle Dot
+    const timeDot = document.createElementNS(svgNS, 'circle');
+    timeDot.setAttribute('id', 'time-indicator-dot');
+    timeDot.setAttribute('r', '2.5');
+    timeDot.setAttribute('fill', '#FFFFFF');
+    timeDot.setAttribute('stroke', '#1D1D1F');
+    timeDot.setAttribute('stroke-width', '1');
+    timeDot.style.display = 'none';
+    svgChart.appendChild(timeDot);
 
     if (activeRoutineBarInterval) clearInterval(activeRoutineBarInterval);
-    activeRoutineBarInterval = setInterval(updateActiveRoutineBar, 15000); 
+    activeRoutineBarInterval = setInterval(updateActiveRoutineBar, 10000); 
     updateActiveRoutineBar();
 }
 
@@ -345,45 +307,44 @@ function getRoutineStatus(item, currentMinutes) {
     const startMin = item.startH * 60 + item.startM;
     let endMin = item.endH * 60 + item.endM;
 
-    if (endMin <= startMin) {
-        endMin += 1440;
-        let adjustedCur = currentMinutes;
-        if (currentMinutes < startMin) adjustedCur += 1440;
-        if (adjustedCur >= startMin && adjustedCur < endMin) return 'now';
+    if (endMin < startMin) {
+        // Spans midnight boundary
+        if (currentMinutes >= startMin || currentMinutes < endMin) return 'now';
+    } else if (startMin === endMin) {
+        return 'upcoming';
     } else {
         if (currentMinutes >= startMin && currentMinutes < endMin) return 'now';
     }
-    
-    return (currentMinutes >= endMin) ? 'done' : 'upcoming';
+    return (currentMinutes >= endMin && startMin <= endMin) ? 'done' : 'upcoming';
 }
 
 function updateActiveRoutineBar() {
     const now = new Date(); const curH = now.getHours(); const curM = now.getMinutes();
-    const currentMinutes = curH * 60 + curM; const activeBar = document.getElementById('active-routine-bar');
-    if (!activeBar) return;
-
-    let activeRoutine = null;
+    const currentMinutes = curH * 60 + curM; 
+    const timeDot = document.getElementById('time-indicator-dot');
     
-    if (curH === 0 && curM === 0) notifiedRoutines = {};
+    let activeRoutine = null;
 
     for (const activity of currentScheduleData) {
         if (getRoutineStatus(activity, currentMinutes) === 'now') {
             activeRoutine = activity;
-            
-            if (!notifiedRoutines[activity.id]) {
-                triggerLocalNotification("Routine Started!", `It's time for: ${activity.label}`);
-                notifiedRoutines[activity.id] = true; 
-            }
             break;
         }
     }
         
     if (activeRoutine) {
-      const curAngle = timeToAngle(curH, curM);
-             activeBar.setAttribute('d', describeArc(cx, cy, radius, curAngle - 0.2, curAngle + 0.2));
-        activeBar.style.display = 'block'; centerActivityLabel.textContent = activeRoutine.label;
+        centerActivityLabel.textContent = activeRoutine.label;
     } else {
-        activeBar.style.display = 'none'; centerActivityLabel.textContent = "No Active Routine"; 
+        centerActivityLabel.textContent = "No Active Routine"; 
+    }
+
+    // Always reposition the present tracking circle pointer
+    if (timeDot) {
+        const currentAngle = timeToAngle(curH, curM);
+        const coords = polarToCartesian(cx, cy, radius, currentAngle);
+        timeDot.setAttribute('cx', coords.x);
+        timeDot.setAttribute('cy', coords.y);
+        timeDot.style.display = 'block';
     }
 
     document.querySelectorAll('.timeline-row').forEach(row => {
@@ -480,7 +441,6 @@ function editActivity(item) {
     activityModal.classList.add('show');
 }
 
-// --- Delete Logic (Updated) ---
 function deleteActivity(id) {
     if(confirm("Delete this activity?")) {
         const routineRef = ref(db, `users/${currentUser.uid}/routines/${id}`);
@@ -500,7 +460,6 @@ addActivityButton.onclick = () => {
 };
 cancelEditButton.onclick = () => activityModal.classList.remove('show');
 
-// --- Form Submission Logic (Updated) ---
 activityForm.addEventListener('submit', (e) => {
     e.preventDefault(); 
     if(!currentUser) {
@@ -520,7 +479,6 @@ activityForm.addEventListener('submit', (e) => {
         const color = existing ? existing.color : getRandomLightColor();
         
         const packed = { id, label, startH, startM, endH, endM, color };
-
         const routineRef = ref(db, `users/${currentUser.uid}/routines/${id}`);
         
         set(routineRef, packed).then(() => {
@@ -537,7 +495,6 @@ activityForm.addEventListener('submit', (e) => {
     }
 });
 
-// Fixed Tab switching Events
 activityTabBtn.addEventListener('click', () => switchTab('activity'));
 quizTabBtn.addEventListener('click', () => switchTab('quiz'));
 
@@ -558,8 +515,12 @@ function switchTab(target) {
     }
 }
 
-// --- Quiz Logic (Direct Gemini API Call) ---
-function cleanTextForComparison(text) { return text ? text.toString().replace(/^[a-zA-Z][.)]\s*/, '').trim() : ''; }
+// --- Quiz Logic ---
+function cleanTextForComparison(text) { 
+    if (!text) return '';
+    // Removes leading letters, numbers followed by punctuation like "A.", "1.", "a)", "B)" and truncates outer spacing
+    return text.toString().replace(/^[a-zA-Z0-9][-.)]\s*/, '').trim().toLowerCase(); 
+}
 
 startQuizBtn.onclick = () => {
     if(!userGeminiApiKey) {
@@ -584,8 +545,8 @@ generateBtn.addEventListener('click', async () => {
     loadingIndicator.style.display = 'block';
     
     const prompt = `Generate ${numQuestions} objective questions about "${topic}" tailored exactly to a **${difficulty}** level of difficulty. 
-Each question should have exactly 4 options (A, B, C, D), one correct answer, and a short, concise explanation for why the correct answer is correct. 
-Provide the output as a JSON array of objects. Each object should have 'questionText', 'options' (an array of strings), 'correctAnswer' (the string of the correct option), and 'explanation' (a string explaining the correct answer).`;
+Each question should have exactly 4 options (A, B, C, D), one correct answer, and a short, concise explanation. 
+Provide the output as a JSON array of objects. Each object should have 'questionText', 'options' (an array of strings), 'correctAnswer' (the exact text matches one of your options array strings), and 'explanation'.`;
 
     const payload = {
         contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -615,7 +576,6 @@ Provide the output as a JSON array of objects. Each object should have 'question
         });
         
         const data = await response.json();
-        
         if (!response.ok) throw new Error(data.error?.message || "Failed to connect to Gemini.");
 
         const jsonString = data.candidates[0].content.parts[0].text;
@@ -661,15 +621,16 @@ function renderQuizStructure() {
         
         let optionsHtml = '';
         q.options.forEach((opt) => {
-            const cleanedOpt = cleanTextForComparison(opt);
-            const isSelected = quizState.selections[idx] === cleanedOpt;
+            const displayOpt = opt.trim();
+            const valueOpt = cleanTextForComparison(opt);
+            const isSelected = quizState.selections[idx] === valueOpt;
             const checked = isSelected ? 'checked' : '';
             const disabled = quizState.submitted ? 'disabled' : '';
             optionsHtml += `
                 <div class="option-wrapper">
                     <label>
-                        <input type="radio" name="q-${idx}" value="${cleanedOpt}" ${checked} ${disabled}>
-                        <span>${cleanedOpt}</span>
+                        <input type="radio" name="q-${idx}" value="${valueOpt}" ${checked} ${disabled}>
+                        <span>${displayOpt}</span>
                     </label>
                 </div>
             `;
@@ -745,7 +706,7 @@ submitBtn.onclick = () => {
     quizState.activeQuestions.forEach((q, idx) => {
         const cleanedSelected = quizState.selections[idx];
         const cleanedCorrect = cleanTextForComparison(q.correctAnswer);
-        if(cleanedSelected === cleanedCorrect) finalScore++;
+        if(cleanedSelected === cleanedCorrect && cleanedSelected !== '') finalScore++;
     });
     quizState.score = finalScore;
 
@@ -765,6 +726,7 @@ function applyQuizEvaluationFeedback() {
 
         const selected = quizState.selections[idx];
         const cleanedCorrect = cleanTextForComparison(q.correctAnswer);
+        const printableCorrect = q.correctAnswer;
 
         card.querySelectorAll('input[type="radio"]').forEach(r => r.disabled = true);
         exp.style.display = 'block';
@@ -774,10 +736,10 @@ function applyQuizEvaluationFeedback() {
             fb.innerHTML = `<span style="color:var(--accent-success);"><i class="fas fa-check-circle"></i> Correct!</span>`;
         } else if(!selected) {
             card.classList.add('eval-unanswered');
-            fb.innerHTML = `<span style="color:var(--accent-warning);"><i class="fas fa-exclamation-triangle"></i> Unanswered. Correct answer: ${cleanedCorrect}</span>`;
+            fb.innerHTML = `<span style="color:var(--accent-warning);"><i class="fas fa-exclamation-triangle"></i> Unanswered. Correct answer: ${printableCorrect}</span>`;
         } else {
             card.classList.add('eval-incorrect');
-            fb.innerHTML = `<span style="color:var(--danger-text);"><i class="fas fa-times-circle"></i> Incorrect. Correct answer: ${cleanedCorrect}</span>`;
+            fb.innerHTML = `<span style="color:var(--danger-text);"><i class="fas fa-times-circle"></i> Incorrect. Correct answer: ${printableCorrect}</span>`;
         }
     });
 
@@ -863,13 +825,17 @@ downloadPdfBtn.onclick = () => {
 
     quizState.activeQuestions.forEach((q, idx) => {
         checkPageBreak(40); parsePdfText(`Q${idx + 1}: ${q.questionText}`, 12, true);
-        q.options.forEach((opt, oIdx) => { parsePdfText(`${String.fromCharCode(65+oIdx)}. ${cleanTextForComparison(opt)}`, 11, false, null, 15); });
+        q.options.forEach((opt) => { parsePdfText(`• ${opt.trim()}`, 11, false, null, 15); });
         if(quizState.submitted) {
             const selected = quizState.selections[idx];
             const cleanedCorrect = cleanTextForComparison(q.correctAnswer);
-            if (selected === cleanedCorrect) { parsePdfText(`Your Answer: ${selected} (Correct)`, 11, true, [16, 185, 129], 15); }
-            else if (selected) { parsePdfText(`Your Answer: ${selected} (Incorrect)`, 11, true, [248, 81, 73], 15); parsePdfText(`Correct Answer: ${cleanedCorrect}`, 11, true, [16, 185, 129], 15); }
-            else { parsePdfText(`Your Answer: [Not Answered]`, 11, true, [245, 158, 11], 15); parsePdfText(`Correct Answer: ${cleanedCorrect}`, 11, true, [16, 185, 129], 15); }
+            
+            // Re-find original text matching criteria for presentation
+            const matchOpt = q.options.find(o => cleanTextForComparison(o) === selected) || selected;
+            
+            if (selected === cleanedCorrect) { parsePdfText(`Your Answer: Correct`, 11, true, [16, 185, 129], 15); }
+            else if (selected) { parsePdfText(`Your Answer: Incorrect`, 11, true, [248, 81, 73], 15); parsePdfText(`Correct Answer: ${q.correctAnswer}`, 11, true, [16, 185, 129], 15); }
+            else { parsePdfText(`Your Answer: [Not Answered]`, 11, true, [245, 158, 11], 15); parsePdfText(`Correct Answer: ${q.correctAnswer}`, 11, true, [16, 185, 129], 15); }
             parsePdfText(`Explanation: ${q.explanation}`, 11, false, [100,100,100], 15);
         }
         currentY += 15;
@@ -886,4 +852,3 @@ document.addEventListener('DOMContentLoaded', () => {
     loadQuizFromLocalStorage();
     document.addEventListener('click', () => { document.querySelectorAll('.action-menu-dropdown.show').forEach(d => d.classList.remove('show')); });
 });
-
