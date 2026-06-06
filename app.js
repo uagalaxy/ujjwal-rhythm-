@@ -384,7 +384,6 @@ function updateActiveRoutineBar() {
         activeBar.style.display = 'block'; centerActivityLabel.textContent = activeRoutine.label;
     } else { 
         activeBar.style.display = 'none'; centerActivityLabel.textContent = "No Active Routine"; 
-      activeBar.setAttribute('d', describeArc(cx, cy, radius, curAngle - 0.2, curAngle + 0.2));
     }
 
     document.querySelectorAll('.timeline-row').forEach(row => {
