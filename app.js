@@ -1,7 +1,6 @@
 // --- Firebase v10 Modular SDK Imports ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-// Added 'remove' to handle specific activity deletions
 import { getDatabase, ref, set, onValue, get, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
 
@@ -37,6 +36,7 @@ let activeRoutineBarInterval;
 let currentUser = null;
 let userGeminiApiKey = null;
 let notifiedRoutines = {}; 
+let routinesUnsubscribe = null; 
 
 // --- Theme Management ---
 const themeToggleBtn = document.getElementById('theme-toggle-btn');
@@ -88,6 +88,12 @@ googleLoginBtn.addEventListener('click', () => {
 
 logoutBtn.addEventListener('click', () => {
     signOut(auth).then(() => {
+        // Kill the realtime listener
+        if (routinesUnsubscribe) {
+            routinesUnsubscribe();
+            routinesUnsubscribe = null;
+        }
+
         resetQuizEnv();
         currentScheduleData = [];
         drawChart();
@@ -164,18 +170,27 @@ saveApiKeyBtn.onclick = () => {
 
 // --- Routine Firebase Syncing (Updated Logic) ---
 function syncRoutines() {
+    // 1. Detach any existing listener before creating a new one
+    if (routinesUnsubscribe) {
+        routinesUnsubscribe();
+    }
+
     const routinesRef = ref(db, `users/${currentUser.uid}/routines`);
     
-    onValue(routinesRef, (snapshot) => {
+    // 2. Save the un-subscriber function
+    routinesUnsubscribe = onValue(routinesRef, (snapshot) => {
         if (snapshot.exists()) {
             const data = snapshot.val();
-            // Convert dictionary to array safely
-            currentScheduleData = Object.values(data);
+            
+            // 3. Convert dictionary to array safely AND filter out any null/corrupt items
+            currentScheduleData = Object.values(data).filter(item => item && typeof item === 'object' && item.id);
+            
             // Sort chronologically for table display
             currentScheduleData.sort((a,b) => (a.startH * 60 + a.startM) - (b.startH * 60 + b.startM));
         } else {
             currentScheduleData = [];
         }
+        
         // Redraw UI automatically based on realtime data
         drawChart();
         createScheduleTable();
