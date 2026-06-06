@@ -192,8 +192,9 @@ function syncRoutines() {
         }
         
         // Redraw UI automatically based on realtime data
-        drawChart();
         createScheduleTable();
+        drawChart();
+        
     });
 }
 
@@ -212,7 +213,7 @@ function triggerLocalNotification(title, body) {
     if ("Notification" in window && Notification.permission === "granted") {
         new Notification(title, {
             body: body,
-            icon: '/icon.png' 
+            icon: 'https://placehold.co/400x400/EEE/31343C?font=playfair-display&text=R' 
         });
     }
 }
