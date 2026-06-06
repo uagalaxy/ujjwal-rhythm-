@@ -22,6 +22,7 @@ const db = getDatabase(app);
 
 // --- Global App State ---
 const LOCAL_STORAGE_KEY_QUIZ = 'dailyRhythmSelfQuizState';
+const LOCAL_STORAGE_KEY_TAB = 'dailyRhythmLastActiveTab';
 let currentScheduleData = [];
 let activeRoutineBarInterval;
 let currentUser = null;
@@ -51,6 +52,28 @@ themeToggleBtn.addEventListener('click', () => {
     localStorage.setItem('theme', isLightMode ? 'light' : 'dark');
     applyTheme();
 });
+
+// --- Tab Persistence Management ---
+/**
+ * Saves the active tab target identifier to localStorage
+ * @param {string} tabName - 'activity' or 'quiz'
+ */
+function persistActiveTab(tabName) {
+    localStorage.setItem(LOCAL_STORAGE_KEY_TAB, tabName);
+}
+
+/**
+ * Reads localStorage and automatically invokes switchTab to restore state
+ */
+function restoreLastActiveTab() {
+    const lastTab = localStorage.getItem(LOCAL_STORAGE_KEY_TAB);
+    // Default to 'activity' view if no record exists yet
+    if (lastTab === 'quiz') {
+        switchTab('quiz');
+    } else {
+        switchTab('activity');
+    }
+}
 
 // --- Auth UI Elements ---
 const loginSection = document.getElementById('login-section');
@@ -495,8 +518,15 @@ activityForm.addEventListener('submit', (e) => {
     }
 });
 
-activityTabBtn.addEventListener('click', () => switchTab('activity'));
-quizTabBtn.addEventListener('click', () => switchTab('quiz'));
+activityTabBtn.addEventListener('click', () => {
+    switchTab('activity');
+    persistActiveTab('activity');
+});
+
+quizTabBtn.addEventListener('click', () => {
+    switchTab('quiz');
+    persistActiveTab('quiz');
+});
 
 function switchTab(target) {
     activityTabBtn.classList.remove('active'); 
@@ -850,5 +880,11 @@ downloadPdfBtn.onclick = () => {
 document.addEventListener('DOMContentLoaded', () => {
     updateDateHeader();
     loadQuizFromLocalStorage();
-    document.addEventListener('click', () => { document.querySelectorAll('.action-menu-dropdown.show').forEach(d => d.classList.remove('show')); });
+    
+    // Restore the user's last open tab configuration
+    restoreLastActiveTab();
+    
+    document.addEventListener('click', () => { 
+        document.querySelectorAll('.action-menu-dropdown.show').forEach(d => d.classList.remove('show')); 
+    });
 });
