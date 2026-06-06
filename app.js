@@ -35,7 +35,7 @@ let currentScheduleData = [];
 let activeRoutineBarInterval;
 let currentUser = null;
 let userGeminiApiKey = null;
-let notifiedRoutines = {}; // Track which routines we've already sent a notification for today
+let notifiedRoutines = {}; 
 
 // --- Theme Management ---
 const themeToggleBtn = document.getElementById('theme-toggle-btn');
@@ -45,11 +45,11 @@ let isLightMode = localStorage.getItem('theme') === 'light';
 function applyTheme() {
     if (isLightMode) {
         document.body.setAttribute('data-theme', 'light');
-        themeToggleBtn.innerHTML = '<i class="fas fa-moon"></i>';
+        themeToggleBtn.innerHTML = '<i class="fas fa-moon"></i> Theme';
         themeMeta.setAttribute('content', '#F2F2F7');
     } else {
         document.body.removeAttribute('data-theme');
-        themeToggleBtn.innerHTML = '<i class="fas fa-sun"></i>';
+        themeToggleBtn.innerHTML = '<i class="fas fa-sun"></i> Theme';
         themeMeta.setAttribute('content', '#000000');
     }
 }
@@ -138,7 +138,6 @@ function fetchGeminiKey() {
         if (snapshot.exists()) {
             userGeminiApiKey = snapshot.val();
         } else {
-            // Prompt for key
             apiKeyModal.classList.add('show');
         }
     });
@@ -167,7 +166,9 @@ function syncRoutines() {
     const routinesRef = ref(db, `users/${currentUser.uid}/routines`);
     onValue(routinesRef, (snapshot) => {
         if (snapshot.exists()) {
-            currentScheduleData = snapshot.val();
+            const data = snapshot.val();
+            // Force data into an array so .forEach() never crashes
+            currentScheduleData = Array.isArray(data) ? data : Object.values(data);
         } else {
             currentScheduleData = [];
         }
@@ -186,8 +187,6 @@ function requestNotificationPermissions() {
     if ("Notification" in window) {
         Notification.requestPermission().then((permission) => {
             if (permission === "granted" && messaging) {
-                // To actually get a token, you need a VAPID key from Firebase console
-                // getToken(messaging, { vapidKey: 'YOUR_VAPID_KEY' }).then(token => ... )
                 console.log("Notification permission granted.");
             }
         });
@@ -198,7 +197,7 @@ function triggerLocalNotification(title, body) {
     if ("Notification" in window && Notification.permission === "granted") {
         new Notification(title, {
             body: body,
-            icon: '/icon.png' // Make sure you have an icon
+            icon: '/icon.png' 
         });
     }
 }
@@ -217,7 +216,6 @@ const timelineContainer = document.getElementById('timeline-container');
 
 // Routine Form Modal
 const activityModal = document.getElementById('activity-modal');
-const modalCloseButton = document.getElementById('modal-close-button');
 const activityForm = document.getElementById('activity-form');
 const activityIdInput = document.getElementById('activity-id');
 const activityLabelInput = document.getElementById('activity-label');
@@ -323,7 +321,7 @@ function drawChart() {
     activeBar.setAttribute('stroke-width', activeBarStrokeWidth); svgChart.appendChild(activeBar);
 
     if (activeRoutineBarInterval) clearInterval(activeRoutineBarInterval);
-    activeRoutineBarInterval = setInterval(updateActiveRoutineBar, 15000); // Check every 15s
+    activeRoutineBarInterval = setInterval(updateActiveRoutineBar, 15000); 
     updateActiveRoutineBar();
 }
 
@@ -350,14 +348,12 @@ function updateActiveRoutineBar() {
 
     let activeRoutine = null;
     
-    // reset notifications array if it's a new day (midnight)
     if (curH === 0 && curM === 0) notifiedRoutines = {};
 
     for (const activity of currentScheduleData) {
         if (getRoutineStatus(activity, currentMinutes) === 'now') {
             activeRoutine = activity;
             
-            // Notification Logic
             if (!notifiedRoutines[activity.id]) {
                 triggerLocalNotification("Routine Started!", `It's time for: ${activity.label}`);
                 notifiedRoutines[activity.id] = true; 
@@ -471,7 +467,7 @@ function editActivity(item) {
 function deleteActivity(id) {
     if(confirm("Delete this activity?")) {
         currentScheduleData = currentScheduleData.filter(i => i.id !== id);
-        saveRoutinesToDB(); // Sync to cloud
+        saveRoutinesToDB(); 
         drawChart(); createScheduleTable(); triggerHUDToast("Activity deleted.");
     }
 }
@@ -481,40 +477,54 @@ addActivityButton.onclick = () => {
     saveButton.textContent = 'Add Activity'; formTitle.textContent = 'Add New Activity';
     activityModal.classList.add('show');
 };
-modalCloseButton.onclick = cancelEditButton.onclick = () => activityModal.classList.remove('show');
+cancelEditButton.onclick = () => activityModal.classList.remove('show');
 
-activityForm.onsubmit = (e) => {
-    e.preventDefault();
-    const id = activityIdInput.value || generateUniqueId();
-    const label = activityLabelInput.value.trim();
-    const startH = parseInt(startTimeInput.value.split(':')[0]);
-    const startM = parseInt(startTimeInput.value.split(':')[1]);
-    const endH = parseInt(endTimeInput.value.split(':')[0]);
-    const endM = parseInt(endTimeInput.value.split(':')[1]);
-    
-    const existing = currentScheduleData.find(i => i.id === id);
-    const color = existing ? existing.color : getRandomLightColor();
-    const packed = { id, label, startH, startM, endH, endM, color };
+// Fixed Form Submission Event (prevents page refresh completely)
+activityForm.addEventListener('submit', (e) => {
+    e.preventDefault(); 
 
-    if(existing) { 
-        const idx = currentScheduleData.findIndex(i => i.id === id); currentScheduleData[idx] = packed; 
-    } else { 
-        currentScheduleData.push(packed); 
+    try {
+        const id = activityIdInput.value || generateUniqueId();
+        const label = activityLabelInput.value.trim();
+        const startH = parseInt(startTimeInput.value.split(':')[0]);
+        const startM = parseInt(startTimeInput.value.split(':')[1]);
+        const endH = parseInt(endTimeInput.value.split(':')[0]);
+        const endM = parseInt(endTimeInput.value.split(':')[1]);
+        
+        const existing = currentScheduleData.find(i => i.id === id);
+        const color = existing ? existing.color : getRandomLightColor();
+        const packed = { id, label, startH, startM, endH, endM, color };
+
+        if(existing) { 
+            const idx = currentScheduleData.findIndex(i => i.id === id); 
+            currentScheduleData[idx] = packed; 
+        } else { 
+            currentScheduleData.push(packed); 
+        }
+
+        currentScheduleData.sort((a,b) => (a.startH * 60 + a.startM) - (b.startH * 60 + b.startM));
+        saveRoutinesToDB(); 
+        
+        drawChart(); 
+        createScheduleTable(); 
+        activityModal.classList.remove('show'); 
+        triggerHUDToast("Activity saved.");
+    } catch (error) {
+        console.error("Form parsing error:", error);
+        triggerHUDToast("Failed to save activity.");
     }
+});
 
-    currentScheduleData.sort((a,b) => (a.startH * 60 + a.startM) - (b.startH * 60 + b.startM));
-    saveRoutinesToDB(); // Sync to cloud
-    
-    drawChart(); createScheduleTable(); activityModal.classList.remove('show'); triggerHUDToast("Activity saved.");
-};
-
-// --- Tabs ---
-activityTabBtn.onclick = () => switchTab('activity');
-quizTabBtn.onclick = () => switchTab('quiz');
+// Fixed Tab switching Events
+activityTabBtn.addEventListener('click', () => switchTab('activity'));
+quizTabBtn.addEventListener('click', () => switchTab('quiz'));
 
 function switchTab(target) {
-    activityTabBtn.classList.remove('active'); quizTabBtn.classList.remove('active');
-    activitySection.classList.remove('active'); quizSection.classList.remove('active');
+    activityTabBtn.classList.remove('active'); 
+    quizTabBtn.classList.remove('active');
+    activitySection.classList.remove('active'); 
+    quizSection.classList.remove('active');
+    
     if(target === 'activity') { 
         activityTabBtn.classList.add('active'); 
         activitySection.classList.add('active'); 
@@ -539,9 +549,10 @@ startQuizBtn.onclick = () => {
 }
 closeQuizConfigBtn.onclick = () => inputModal.classList.remove('show');
 
-generateBtn.onclick = async () => {
+// Fixed Gemini API Call logic using responseSchema
+generateBtn.addEventListener('click', async () => {
     const topic = document.getElementById('modalTopicInput').value.trim();
-    const difficulty = document.getElementById('modalDifficultySelect').value;
+    const difficulty = document.getElementById('modalDifficultySelect').value || 'medium';
     const numQuestions = parseInt(document.getElementById('modalNumQuestionsSelect').value);
     
     if(!topic) { alert("Please provide a quiz topic."); return; }
@@ -551,15 +562,27 @@ generateBtn.onclick = async () => {
     landingPage.style.display = 'none';
     loadingIndicator.style.display = 'block';
     
-    // Construct Prompt
     const prompt = `Generate ${numQuestions} objective questions about "${topic}" tailored exactly to a **${difficulty}** level of difficulty. 
-Each question should have exactly 4 options (A, B, C, D), one correct answer, and a short explanation for why the correct answer is correct. 
-Provide the output strictly as a JSON array of objects. Each object should have 'questionText', 'options' (an array of strings), 'correctAnswer' (string of the correct option exactly as it appears in the array), and 'explanation'.`;
+Each question should have exactly 4 options (A, B, C, D), one correct answer, and a short, concise explanation for why the correct answer is correct. 
+Provide the output as a JSON array of objects. Each object should have 'questionText', 'options' (an array of strings), 'correctAnswer' (the string of the correct option), and 'explanation' (a string explaining the correct answer).`;
 
     const payload = {
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         generationConfig: {
-            responseMimeType: "application/json"
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: "ARRAY",
+                items: {
+                    type: "OBJECT",
+                    properties: {
+                        "questionText": { "type": "STRING" },
+                        "options": { "type": "ARRAY", "items": { "type": "STRING" } },
+                        "correctAnswer": { "type": "STRING" },
+                        "explanation": { "type": "STRING" }
+                    },
+                    required: ["questionText", "options", "correctAnswer", "explanation"]
+                }
+            }
         }
     };
 
@@ -594,18 +617,19 @@ Provide the output strictly as a JSON array of objects. Each object should have 
 
             renderQuizStructure();
             beginQuizTimer();
-            saveQuizToLocalStorage(); // Keep quiz state local as requested
+            saveQuizToLocalStorage(); 
             triggerHUDToast("Quiz ready!");
         } else {
             throw new Error("Failed to parse valid questions from AI response.");
         }
     } catch (err) {
+        console.error("Gemini Generation Error:", err);
         loadingIndicator.style.display = 'none';
         quizContainer.style.display = 'block';
-        quizContainer.innerHTML = `<h3 style="color:var(--danger-hover-bg); padding:20px;">Generation Error: ${err.message}</h3>`;
+        quizContainer.innerHTML = `<h3 style="color:var(--danger-text); padding:20px;">Generation Error: ${err.message}</h3>`;
         setTimeout(() => resetQuizEnv(), 4000);
     }
-};
+});
 
 function renderQuizStructure() {
     quizContainer.innerHTML = `<h2>Quiz Workspace</h2>`;
@@ -732,7 +756,7 @@ function applyQuizEvaluationFeedback() {
             fb.innerHTML = `<span style="color:var(--accent-warning);"><i class="fas fa-exclamation-triangle"></i> Unanswered. Correct answer: ${cleanedCorrect}</span>`;
         } else {
             card.classList.add('eval-incorrect');
-            fb.innerHTML = `<span style="color:var(--danger-hover-bg);"><i class="fas fa-times-circle"></i> Incorrect. Correct answer: ${cleanedCorrect}</span>`;
+            fb.innerHTML = `<span style="color:var(--danger-text);"><i class="fas fa-times-circle"></i> Incorrect. Correct answer: ${cleanedCorrect}</span>`;
         }
     });
 
@@ -784,7 +808,6 @@ function loadQuizFromLocalStorage() {
 }
 
 downloadPdfBtn.onclick = () => {
-    // Keep your exact existing PDF generation code here
     if(quizState.activeQuestions.length === 0) return;
     triggerHUDToast("Generating PDF summary...");
     const { jsPDF } = window.jspdf;
@@ -842,4 +865,3 @@ document.addEventListener('DOMContentLoaded', () => {
     loadQuizFromLocalStorage();
     document.addEventListener('click', () => { document.querySelectorAll('.action-menu-dropdown.show').forEach(d => d.classList.remove('show')); });
 });
-
