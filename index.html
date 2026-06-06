@@ -26,10 +26,17 @@
                 <div id="date-day-header" class="date-day-header"></div>
             </div>
             <div class="user-controls">
-                <button id="theme-toggle-btn" class="icon-btn" title="Toggle Light/Dark Mode"><i class="fas fa-sun"></i></button>
-                <button id="settings-btn" class="icon-btn" style="display: none;" title="API Key Settings"><i class="fas fa-key"></i></button>
-                <img id="user-avatar" src="" alt="Profile" style="display: none;">
-                <button id="logout-btn" class="icon-btn danger-text" style="display: none;" title="Logout"><i class="fas fa-sign-out-alt"></i></button>
+                <div class="profile-menu-wrapper">
+                    <div id="profile-trigger" class="profile-trigger" title="User Menu">
+                        <img id="user-avatar" src="" alt="Profile" style="display: none;">
+                        <i id="default-avatar-icon" class="fas fa-user-circle"></i>
+                    </div>
+                    <div id="profile-dropdown" class="action-menu-dropdown profile-dropdown">
+                        <button id="theme-toggle-btn"><i class="fas fa-sun"></i> Theme</button>
+                        <button id="settings-btn" style="display: none;"><i class="fas fa-key"></i> API Key</button>
+                        <button id="logout-btn" class="delete-btn" style="display: none;"><i class="fas fa-sign-out-alt"></i> Logout</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -53,7 +60,7 @@
             <div class="timeline-wrapper">
                 <div id="timeline-container"></div>
             </div>
-            <button type="button" class="primary" id="add-activity-button" style="margin: 0 auto; display: inline-flex;">
+            <button type="button" class="primary w-full" id="add-activity-button" style="margin: 0 auto; display: inline-flex;">
                 <i class="fas fa-plus-circle"></i> Add New Activity
             </button>
         </div>
@@ -82,17 +89,16 @@
         </div>
 
         <div id="controls" class="glass-panel" style="display: none; padding: 20px;">
-            <div class="button-group" style="margin: 0;">
-                <button id="submitBtn" class="primary flex-1">Submit Test</button>
-                <button id="downloadPdfBtn" class="secondary flex-1"><i class="fas fa-file-pdf"></i> Save PDF</button>
-                <button id="resetQuizBtn" class="danger flex-1">Reset</button>
+            <div class="button-group-vertical" style="margin: 0;">
+                <button id="submitBtn" class="primary w-full">Submit Test</button>
+                <button id="downloadPdfBtn" class="secondary w-full"><i class="fas fa-file-pdf"></i> Save PDF</button>
+                <button id="resetQuizBtn" class="danger w-full">Reset</button>
             </div>
         </div>
     </div>
 
     <div id="activity-modal" class="modal-overlay">
         <div class="modal-content">
-            <button class="modal-close-button" id="modal-close-button">&times;</button>
             <h2 id="form-title" style="margin-top:0; margin-bottom:1.5rem; font-size:1.4rem;">Add New Activity</h2>
             <form id="activity-form">
                 <input type="hidden" id="activity-id">
@@ -110,9 +116,9 @@
                         <input type="time" id="end-time" required>
                     </div>
                 </div>
-                <div class="button-group">
-                    <button type="submit" class="primary" id="save-button">Add Activity</button>
-                    <button type="button" class="secondary" id="cancel-edit-button">Cancel</button>
+                <div class="button-group-vertical">
+                    <button type="submit" class="primary w-full" id="save-button">Add Activity</button>
+                    <button type="button" class="secondary w-full" id="cancel-edit-button">Cancel</button>
                 </div>
             </form>
         </div>
@@ -120,7 +126,6 @@
 
     <div id="inputModal" class="modal-overlay">
         <div class="modal-content">
-            <button class="modal-close-button" id="closeQuizConfigBtn">&times;</button>
             <h2 style="margin-top: 0; margin-bottom: 1.5rem; font-size: 1.4rem;">Setup Quiz</h2>
             <div class="form-group">
                 <label for="modalTopicInput">Quiz Topic:</label>
@@ -144,20 +149,25 @@
                     </select>
                 </div>
             </div>
-            <button id="generateBtn" class="primary w-full"><i class="fas fa-cog"></i> Generate Questions</button>
+            <div class="button-group-vertical">
+                <button id="generateBtn" class="primary w-full"><i class="fas fa-cog"></i> Generate Questions</button>
+                <button id="closeQuizConfigBtn" class="secondary w-full">Cancel</button>
+            </div>
         </div>
     </div>
 
     <div id="api-key-modal" class="modal-overlay">
         <div class="modal-content">
-            <button class="modal-close-button" id="close-api-key-btn">&times;</button>
             <h2 style="margin-top: 0; margin-bottom: 1.5rem; font-size: 1.4rem;">Gemini API Key</h2>
             <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 15px;">Enter your Google Gemini API key to enable personalized quiz generation.</p>
             <div class="form-group">
                 <label for="gemini-api-key-input">API Key:</label>
                 <input type="password" id="gemini-api-key-input" placeholder="AIzaSy..." required>
             </div>
-            <button id="save-api-key-btn" class="primary w-full">Save Key</button>
+            <div class="button-group-vertical">
+                <button id="save-api-key-btn" class="primary w-full">Save Key</button>
+                <button id="close-api-key-btn" class="secondary w-full">Cancel</button>
+            </div>
         </div>
     </div>
 
@@ -188,6 +198,18 @@
     </div>
 
     <script type="module" src="app.js"></script>
+    <script>
+        // Simple script to toggle the new profile dropdown menu 
+        document.getElementById('profile-trigger').addEventListener('click', function() {
+            document.getElementById('profile-dropdown').classList.toggle('show');
+        });
+
+        // Close dropdown when clicking outside
+        window.addEventListener('click', function(e) {
+            if (!document.querySelector('.profile-menu-wrapper').contains(e.target)) {
+                document.getElementById('profile-dropdown').classList.remove('show');
+            }
+        });
+    </script>
 </body>
 </html>
-
