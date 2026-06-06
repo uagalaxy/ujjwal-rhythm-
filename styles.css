@@ -118,7 +118,7 @@ body {
     width: 44px;
     height: 44px;
     border-radius: 50%;
-    background: var(--button-bg-secondary);
+    background: var(--glass-bg);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -146,7 +146,7 @@ body {
     position: absolute; 
     top: calc(100% + 10px); 
     right: 0; 
-    background: white; 
+    background: var(--glass-bg) !important; 
     backdrop-filter: blur(25px);
     border: 1px solid var(--border-color); 
     border-radius: 16px; 
