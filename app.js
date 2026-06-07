@@ -142,6 +142,7 @@ logoutBtn.addEventListener('click', () => {
         // Purge all persistent security handles and locally mirrored objects
         localStorage.removeItem(LOCAL_STORAGE_KEY_USER);
         localStorage.removeItem(LOCAL_STORAGE_KEY_ROUTINES);
+        localStorage.removeItem(LOCAL_STORAGE_KEY_TAB);
         
         currentUser = null;
         userGeminiApiKey = null;
@@ -494,6 +495,7 @@ function handleArcHoverIn(e) {
     infoLabel.textContent = target.label;
     infoTime.textContent = `${formatTime(target.startH, target.startM)} - ${formatTime(target.endH, target.endM)}`;
     arcInfoTooltip.classList.add('show');
+  setTimeout(() => arcInfoTooltip.classList.remove('show'), 3500);
 }
 function handleArcHoverMove(e) { arcInfoTooltip.style.left = `${e.clientX}px`; arcInfoTooltip.style.top = `${e.clientY}px`; }
 function handleArcHoverOut() { arcInfoTooltip.classList.remove('show'); }
