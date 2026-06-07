@@ -20,14 +20,101 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
 
-// --- Global App State ---
+// --- Global App State & Keys ---
 const LOCAL_STORAGE_KEY_QUIZ = 'dailyRhythmSelfQuizState';
 const LOCAL_STORAGE_KEY_TAB = 'dailyRhythmLastActiveTab';
+const LOCAL_STORAGE_KEY_AUTH_CACHE = 'dailyRhythmAuthSnapshot'; // Immediate secure UI rendering key
+
 let currentScheduleData = [];
 let activeRoutineBarInterval;
 let currentUser = null;
 let userGeminiApiKey = null;
 let routinesUnsubscribe = null; 
+
+// --- UI Element Selectors ---
+const loginSection = document.getElementById('login-section');
+const mainTabs = document.getElementById('main-tabs');
+const activitySection = document.getElementById('activity-section');
+const quizSection = document.getElementById('quiz-section');
+const googleLoginBtn = document.getElementById('google-login-btn');
+const logoutBtn = document.getElementById('logout-btn');
+const userAvatar = document.getElementById('user-avatar');
+const appTitle = document.getElementById('oneui-app-title');
+const dateDayHeader = document.getElementById('date-day-header');
+const svgChart = document.getElementById('schedule-chart');
+const centerActivityLabel = document.getElementById('center-activity-label');
+const addActivityButton = document.getElementById('add-activity-button');
+const timelineContainer = document.getElementById('timeline-container');
+
+// API Key Elements
+const apiKeyModal = document.getElementById('api-key-modal');
+const settingsBtn = document.getElementById('settings-btn');
+const closeApiKeyBtn = document.getElementById('close-api-key-btn');
+const saveApiKeyBtn = document.getElementById('save-api-key-btn');
+const geminiApiKeyInput = document.getElementById('gemini-api-key-input');
+
+// Routine Form Modal
+const activityModal = document.getElementById('activity-modal');
+const activityForm = document.getElementById('activity-form');
+const activityIdInput = document.getElementById('activity-id');
+const activityLabelInput = document.getElementById('activity-label');
+const startTimeInput = document.getElementById('start-time');
+const endTimeInput = document.getElementById('end-time');
+const saveButton = document.getElementById('save-button');
+const cancelEditButton = document.getElementById('cancel-edit-button');
+const formTitle = document.getElementById('form-title');
+
+// Tooltip & Tabs Buttons
+const arcInfoTooltip = document.getElementById('arc-info-tooltip');
+const infoLabel = arcInfoTooltip.querySelector('.info-label');
+const infoTime = arcInfoTooltip.querySelector('.info-time');
+const activityTabBtn = document.getElementById('activity-tab-btn');
+const quizTabBtn = document.getElementById('quiz-tab-btn');
+
+// --- Instant UI Bootstrapping (Removes Flash/Flicker) ---
+function bootstrapAuthState() {
+    const cachedUser = localStorage.getItem(LOCAL_STORAGE_KEY_AUTH_CACHE);
+    if (cachedUser) {
+        try {
+            const userParsed = JSON.parse(cachedUser);
+            // Instantly transition state wrappers to active layouts
+            loginSection.style.display = 'none';
+            loginSection.classList.remove('active');
+            mainTabs.style.display = 'flex';
+            
+            if (userParsed.photoURL) {
+                userAvatar.src = userParsed.photoURL;
+                userAvatar.style.display = 'block';
+            }
+            logoutBtn.style.display = 'flex';
+            settingsBtn.style.display = 'flex';
+            
+            // Re-apply targeted tab visibility instantly before Firebase responses finish
+            const activeTab = localStorage.getItem(LOCAL_STORAGE_KEY_TAB) || 'activity';
+            switchTab(activeTab);
+        } catch (e) {
+            clearAuthCacheUI();
+        }
+    } else {
+        clearAuthCacheUI();
+    }
+}
+
+function clearAuthCacheUI() {
+    loginSection.style.display = 'block';
+    loginSection.classList.add('active');
+    activitySection.style.display = 'none';
+    activitySection.classList.remove('active');
+    quizSection.style.display = 'none';
+    quizSection.classList.remove('active');
+    mainTabs.style.display = 'none';
+    userAvatar.style.display = 'none';
+    logoutBtn.style.display = 'none';
+    settingsBtn.style.display = 'none';
+}
+
+// Call bootstrapping instantly at engine evaluation phase
+bootstrapAuthState();
 
 // --- Theme Management ---
 const themeToggleBtn = document.getElementById('theme-toggle-btn');
@@ -38,14 +125,14 @@ function applyTheme() {
     if (isLightMode) {
         document.body.setAttribute('data-theme', 'light');
         themeToggleBtn.innerHTML = '<i class="fas fa-moon"></i> Theme';
-        themeMeta.setAttribute('content', '#F2F2F7');
+        if(themeMeta) themeMeta.setAttribute('content', '#F2F2F7');
     } else {
         document.body.removeAttribute('data-theme');
         themeToggleBtn.innerHTML = '<i class="fas fa-sun"></i> Theme';
-        themeMeta.setAttribute('content', '#000000');
+        if(themeMeta) themeMeta.setAttribute('content', '#000000');
     }
 }
-applyTheme(); // Run on load
+applyTheme();
 
 themeToggleBtn.addEventListener('click', () => {
     isLightMode = !isLightMode;
@@ -54,41 +141,14 @@ themeToggleBtn.addEventListener('click', () => {
 });
 
 // --- Tab Persistence Management ---
-/**
- * Saves the active tab target identifier to localStorage
- * @param {string} tabName - 'activity' or 'quiz'
- */
 function persistActiveTab(tabName) {
     localStorage.setItem(LOCAL_STORAGE_KEY_TAB, tabName);
 }
 
-/**
- * Reads localStorage and automatically invokes switchTab to restore state
- */
 function restoreLastActiveTab() {
     const lastTab = localStorage.getItem(LOCAL_STORAGE_KEY_TAB);
-    // Default to 'activity' view if no record exists yet
-    if (lastTab === 'quiz') {
-        switchTab('quiz');
-    } else {
-        switchTab('activity');
-    }
+    switchTab(lastTab === 'quiz' ? 'quiz' : 'activity');
 }
-
-// --- Auth UI Elements ---
-const loginSection = document.getElementById('login-section');
-const mainTabs = document.getElementById('main-tabs');
-const activitySection = document.getElementById('activity-section');
-const googleLoginBtn = document.getElementById('google-login-btn');
-const logoutBtn = document.getElementById('logout-btn');
-const userAvatar = document.getElementById('user-avatar');
-
-// API Key Elements
-const apiKeyModal = document.getElementById('api-key-modal');
-const settingsBtn = document.getElementById('settings-btn');
-const closeApiKeyBtn = document.getElementById('close-api-key-btn');
-const saveApiKeyBtn = document.getElementById('save-api-key-btn');
-const geminiApiKeyInput = document.getElementById('gemini-api-key-input');
 
 // --- Auth Logic ---
 googleLoginBtn.addEventListener('click', () => {
@@ -105,6 +165,7 @@ logoutBtn.addEventListener('click', () => {
             routinesUnsubscribe();
             routinesUnsubscribe = null;
         }
+        localStorage.removeItem(LOCAL_STORAGE_KEY_AUTH_CACHE);
         resetQuizEnv();
         currentScheduleData = [];
         drawChart();
@@ -112,11 +173,21 @@ logoutBtn.addEventListener('click', () => {
     });
 });
 
+// Optimized dynamic state syncing engine
 onAuthStateChanged(auth, (user) => {
     if (user) {
         currentUser = user;
+        
+        // Cache secure UI identity features
+        const userSnapshot = {
+            uid: user.uid,
+            displayName: user.displayName,
+            photoURL: user.photoURL
+        };
+        localStorage.setItem(LOCAL_STORAGE_KEY_AUTH_CACHE, JSON.stringify(userSnapshot));
+
+        loginSection.style.display = 'none';
         loginSection.classList.remove('active');
-        activitySection.classList.add('active');
         mainTabs.style.display = 'flex';
         
         userAvatar.src = user.photoURL;
@@ -126,20 +197,15 @@ onAuthStateChanged(auth, (user) => {
         
         triggerHUDToast(`Welcome, ${user.displayName.split(' ')[0]}!`);
         
+        // Restore tab layout config seamlessly
+        restoreLastActiveTab();
         syncRoutines();
         fetchGeminiKey();
     } else {
         currentUser = null;
         userGeminiApiKey = null;
-        
-        loginSection.classList.add('active');
-        activitySection.classList.remove('active');
-        document.getElementById('quiz-section').classList.remove('active');
-        mainTabs.style.display = 'none';
-        
-        userAvatar.style.display = 'none';
-        logoutBtn.style.display = 'none';
-        settingsBtn.style.display = 'none';
+        localStorage.removeItem(LOCAL_STORAGE_KEY_AUTH_CACHE);
+        clearAuthCacheUI();
     }
 });
 
@@ -200,38 +266,11 @@ const svgNS = "http://www.w3.org/2000/svg";
 const cx = 50; const cy = 50; const radius = 45;
 const strokeWidth = 9;
 
-const appTitle = document.getElementById('oneui-app-title');
-const dateDayHeader = document.getElementById('date-day-header');
-const svgChart = document.getElementById('schedule-chart');
-const centerActivityLabel = document.getElementById('center-activity-label');
-const addActivityButton = document.getElementById('add-activity-button');
-const timelineContainer = document.getElementById('timeline-container');
-
-// Routine Form Modal
-const activityModal = document.getElementById('activity-modal');
-const activityForm = document.getElementById('activity-form');
-const activityIdInput = document.getElementById('activity-id');
-const activityLabelInput = document.getElementById('activity-label');
-const startTimeInput = document.getElementById('start-time');
-const endTimeInput = document.getElementById('end-time');
-const saveButton = document.getElementById('save-button');
-const cancelEditButton = document.getElementById('cancel-edit-button');
-const formTitle = document.getElementById('form-title');
-
-// Tooltip & Tabs
-const arcInfoTooltip = document.getElementById('arc-info-tooltip');
-const infoLabel = arcInfoTooltip.querySelector('.info-label');
-const infoTime = arcInfoTooltip.querySelector('.info-time');
-
-const activityTabBtn = document.getElementById('activity-tab-btn');
-const quizTabBtn = document.getElementById('quiz-tab-btn');
-const quizSection = document.getElementById('quiz-section');
-
 // Quiz State
 let quizState = { topic: '', activeQuestions: [], selections: {}, submitted: false, score: 0, elapsedSeconds: 0, isLocked: false };
 let quizTimerInterval = null;
 
-// Quiz Elements
+// Quiz Elements Reference Maps
 const landingPage = document.getElementById('landingPage');
 const loadingIndicator = document.getElementById('loadingIndicator');
 const startQuizBtn = document.getElementById('startQuizBtn');
@@ -266,10 +305,11 @@ function triggerHUDToast(msg) {
 }
 
 function polarToCartesian(centerX, centerY, r, angleInDegrees) {
-    const angleInRadians = (angleInDegrees - 90) * Math.PI / 180.0; // Corrected offset to make 12:00 AM straight up
+    const angleInRadians = (angleInDegrees - 90) * Math.PI / 180.0;
     return { x: centerX + (r * Math.cos(angleInRadians)), y: centerY + (r * Math.sin(angleInRadians)) };
 }
 
+// Fixed Arc path formula computation
 function describeArc(x, y, r, startAngle, endAngle) {
     if (endAngle < startAngle) endAngle += 360;
     const start = polarToCartesian(x, y, r, startAngle);
@@ -285,12 +325,15 @@ function formatTime(h, m) {
 }
 
 function updateDateHeader() {
-    const now = new Date();
-    dateDayHeader.textContent = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    if(dateDayHeader) {
+        const now = new Date();
+        dateDayHeader.textContent = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    }
 }
 
 // --- Chart Drawing ---
 function drawChart() {
+    if (!svgChart) return;
     svgChart.innerHTML = '';
     const bgCircle = document.createElementNS(svgNS, 'circle');
     bgCircle.setAttribute('cx', cx); bgCircle.setAttribute('cy', cy); bgCircle.setAttribute('r', radius);
@@ -311,7 +354,6 @@ function drawChart() {
         svgChart.appendChild(arc);
     });
 
-    // Time Indicator Circle Dot
     const timeDot = document.createElementNS(svgNS, 'circle');
     timeDot.setAttribute('id', 'time-indicator-dot');
     timeDot.setAttribute('r', '2.5');
@@ -331,7 +373,6 @@ function getRoutineStatus(item, currentMinutes) {
     let endMin = item.endH * 60 + item.endM;
 
     if (endMin < startMin) {
-        // Spans midnight boundary
         if (currentMinutes >= startMin || currentMinutes < endMin) return 'now';
     } else if (startMin === endMin) {
         return 'upcoming';
@@ -355,13 +396,10 @@ function updateActiveRoutineBar() {
         }
     }
         
-    if (activeRoutine) {
-        centerActivityLabel.textContent = activeRoutine.label;
-    } else {
-        centerActivityLabel.textContent = "No Active Routine"; 
+    if (centerActivityLabel) {
+        centerActivityLabel.textContent = activeRoutine ? activeRoutine.label : "No Active Routine";
     }
 
-    // Always reposition the present tracking circle pointer
     if (timeDot) {
         const currentAngle = timeToAngle(curH, curM);
         const coords = polarToCartesian(cx, cy, radius, currentAngle);
@@ -385,6 +423,7 @@ function updateActiveRoutineBar() {
 }
 
 function createScheduleTable() {
+    if(!timelineContainer) return;
     timelineContainer.innerHTML = '';
     if (currentScheduleData.length === 0) {
         timelineContainer.innerHTML = `<div style="text-align: center; padding: 24px; color: var(--text-muted); font-size: 0.95rem;">No assigned activities found. Setup a routine to monitor progress.</div>`;
@@ -476,12 +515,14 @@ function deleteActivity(id) {
     }
 }
 
-addActivityButton.onclick = () => {
-    activityIdInput.value = ''; activityForm.reset();
-    saveButton.textContent = 'Add Activity'; formTitle.textContent = 'Add New Activity';
-    activityModal.classList.add('show');
-};
-cancelEditButton.onclick = () => activityModal.classList.remove('show');
+if(addActivityButton) {
+    addActivityButton.onclick = () => {
+        activityIdInput.value = ''; activityForm.reset();
+        saveButton.textContent = 'Add Activity'; formTitle.textContent = 'Add New Activity';
+        activityModal.classList.add('show');
+    };
+}
+if(cancelEditButton) cancelEditButton.onclick = () => activityModal.classList.remove('show');
 
 activityForm.addEventListener('submit', (e) => {
     e.preventDefault(); 
@@ -511,7 +552,6 @@ activityForm.addEventListener('submit', (e) => {
             console.error("Firebase save error:", error);
             triggerHUDToast("Failed to save activity.");
         });
-
     } catch (error) {
         console.error("Form parsing error:", error);
         triggerHUDToast("Failed to parse activity.");
@@ -529,43 +569,45 @@ quizTabBtn.addEventListener('click', () => {
 });
 
 function switchTab(target) {
+    if(!currentUser) return; // Prevent tab routing if unauthenticated
+
     activityTabBtn.classList.remove('active'); 
     quizTabBtn.classList.remove('active');
-    activitySection.classList.remove('active'); 
-    quizSection.classList.remove('active');
     
-    // Explicitly handle display styles to prevent both showing simultaneously
     if(target === 'activity') { 
         activityTabBtn.classList.add('active'); 
         activitySection.classList.add('active'); 
-        activitySection.style.display = 'block'; // Force show
-        quizSection.style.display = 'none';      // Force hide
-        appTitle.textContent = "Routine";
+        activitySection.style.display = 'block';
+        quizSection.style.display = 'none';
+        quizSection.classList.remove('active');
+        if(appTitle) appTitle.textContent = "Routine";
     } else { 
         quizTabBtn.classList.add('active'); 
         quizSection.classList.add('active'); 
-        quizSection.style.display = 'block';     // Force show
-        activitySection.style.display = 'none';  // Force hide
-        appTitle.textContent = "Quiz practice";
+        quizSection.style.display = 'block';
+        activitySection.style.display = 'none';
+        activitySection.classList.remove('active');
+        if(appTitle) appTitle.textContent = "Quiz practice";
     }
 }
 
 // --- Quiz Logic ---
 function cleanTextForComparison(text) { 
     if (!text) return '';
-    // Removes leading letters, numbers followed by punctuation like "A.", "1.", "a)", "B)" and truncates outer spacing
     return text.toString().replace(/^[a-zA-Z0-9][-.)]\s*/, '').trim().toLowerCase(); 
 }
 
-startQuizBtn.onclick = () => {
-    if(!userGeminiApiKey) {
-        triggerHUDToast("Please add your Gemini API Key in settings first.");
-        apiKeyModal.classList.add('show');
-        return;
-    }
-    inputModal.classList.add('show');
+if(startQuizBtn) {
+    startQuizBtn.onclick = () => {
+        if(!userGeminiApiKey) {
+            triggerHUDToast("Please add your Gemini API Key in settings first.");
+            apiKeyModal.classList.add('show');
+            return;
+        }
+        inputModal.classList.add('show');
+    };
 }
-closeQuizConfigBtn.onclick = () => inputModal.classList.remove('show');
+if(closeQuizConfigBtn) closeQuizConfigBtn.onclick = () => inputModal.classList.remove('show');
 
 generateBtn.addEventListener('click', async () => {
     const topic = document.getElementById('modalTopicInput').value.trim();
@@ -579,9 +621,7 @@ generateBtn.addEventListener('click', async () => {
     landingPage.style.display = 'none';
     loadingIndicator.style.display = 'block';
     
-    const prompt = `Generate ${numQuestions} objective questions about "${topic}" tailored exactly to a **${difficulty}** level of difficulty. 
-Each question should have exactly 4 options (A, B, C, D), one correct answer, and a short, concise explanation. 
-Provide the output as a JSON array of objects. Each object should have 'questionText', 'options' (an array of strings), 'correctAnswer' (the exact text matches one of your options array strings), and 'explanation'.`;
+    const prompt = `Generate ${numQuestions} objective questions about "${topic}" tailored exactly to a **${difficulty}** level of difficulty. \nEach question should have exactly 4 options (A, B, C, D), one correct answer, and a short, concise explanation. \nProvide the output as a JSON array of objects. Each object should have 'questionText', 'options' (an array of strings), 'correctAnswer' (the exact text matches one of your options array strings), and 'explanation'.`;
 
     const payload = {
         contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -623,13 +663,7 @@ Provide the output as a JSON array of objects. Each object should have 'question
             controls.style.display = 'block';
             progressWrapper.style.display = 'block';
 
-            quizState.topic = topic;
-            quizState.activeQuestions = result;
-            quizState.selections = {};
-            quizState.submitted = false;
-            quizState.score = 0;
-            quizState.elapsedSeconds = 0;
-            quizState.isLocked = false;
+            quizState = { topic, activeQuestions: result, selections: {}, submitted: false, score: 0, elapsedSeconds: 0, isLocked: false };
 
             renderQuizStructure();
             beginQuizTimer();
@@ -685,7 +719,6 @@ function renderQuizStructure() {
                 saveQuizToLocalStorage();
             };
         });
-
         quizContainer.appendChild(card);
     });
 
@@ -694,64 +727,72 @@ function renderQuizStructure() {
 
 function updateQuizProgressBarHUD() {
     const total = quizState.activeQuestions.length;
-    if(total === 0) return;
+    if(total === 0 || !progressBarFill) return;
     const filled = Object.keys(quizState.selections).length;
     progressBarFill.style.width = `${(filled / total) * 100}%`;
 }
 
 function beginQuizTimer() {
     if(quizTimerInterval) clearInterval(quizTimerInterval);
-    floatingTimerControls.style.display = 'block';
+    if(floatingTimerControls) floatingTimerControls.style.display = 'block';
     updateTimerDisplayHUD();
     quizTimerInterval = setInterval(() => {
         if(!quizState.isLocked && !quizState.submitted) {
-            quizState.elapsedSeconds++; updateTimerDisplayHUD();
+            quizState.elapsedSeconds++; 
+            updateTimerDisplayHUD();
             if(quizState.elapsedSeconds % 5 === 0) saveQuizToLocalStorage();
         }
     }, 1000);
 }
 
 function updateTimerDisplayHUD() {
+    if(!timerDisplay) return;
     const m = Math.floor(quizState.elapsedSeconds / 60); const s = quizState.elapsedSeconds % 60;
     timerDisplay.innerHTML = `<i class="far fa-clock"></i> Time: ${m < 10 ? '0'+m : m}:${s < 10 ? '0'+s : s}`;
 }
 
-pauseBtn.onclick = () => {
-    quizState.isLocked = true; quizOverlay.style.display = 'flex';
-    document.body.style.overflow = 'hidden';
-    saveQuizToLocalStorage();
-};
+if(pauseBtn) {
+    pauseBtn.onclick = () => {
+        quizState.isLocked = true; quizOverlay.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+        saveQuizToLocalStorage();
+    };
+}
 
-overlayResumeBtn.onclick = () => {
-    quizState.isLocked = false; quizOverlay.style.display = 'none';
-    document.body.style.overflow = '';
-    saveQuizToLocalStorage();
-};
+if(overlayResumeBtn) {
+    overlayResumeBtn.onclick = () => {
+        quizState.isLocked = false; quizOverlay.style.display = 'none';
+        document.body.style.overflow = '';
+        saveQuizToLocalStorage();
+    };
+}
 
-submitBtn.onclick = () => {
-    if(Object.keys(quizState.selections).length < quizState.activeQuestions.length) {
-        if(!confirm("Several questions remain unanswered. Submit evaluation regardless?")) return;
-    }
+if(submitBtn) {
+    submitBtn.onclick = () => {
+        if(Object.keys(quizState.selections).length < quizState.activeQuestions.length) {
+            if(!confirm("Several questions remain unanswered. Submit evaluation regardless?")) return;
+        }
+        
+        clearInterval(quizTimerInterval);
+        quizState.submitted = true;
+        document.body.style.overflow = ''; 
+        
+        let finalScore = 0;
+        quizState.activeQuestions.forEach((q, idx) => {
+            const cleanedSelected = quizState.selections[idx];
+            const cleanedCorrect = cleanTextForComparison(q.correctAnswer);
+            if(cleanedSelected === cleanedCorrect && cleanedSelected !== '') finalScore++;
+        });
+        quizState.score = finalScore;
     
-    clearInterval(quizTimerInterval);
-    quizState.submitted = true;
-    document.body.style.overflow = ''; 
-    
-    let finalScore = 0;
-    quizState.activeQuestions.forEach((q, idx) => {
-        const cleanedSelected = quizState.selections[idx];
-        const cleanedCorrect = cleanTextForComparison(q.correctAnswer);
-        if(cleanedSelected === cleanedCorrect && cleanedSelected !== '') finalScore++;
-    });
-    quizState.score = finalScore;
-
-    applyQuizEvaluationFeedback();
-    saveQuizToLocalStorage();
+        applyQuizEvaluationFeedback();
+        saveQuizToLocalStorage();
+    };
 }
 
 function applyQuizEvaluationFeedback() {
-    floatingTimerControls.style.display = 'none';
-    progressWrapper.style.display = 'none';
+    if(floatingTimerControls) floatingTimerControls.style.display = 'none';
+    if(progressWrapper) progressWrapper.style.display = 'none';
     
     quizState.activeQuestions.forEach((q, idx) => {
         const card = document.getElementById(`qcard-${idx}`);
@@ -764,25 +805,27 @@ function applyQuizEvaluationFeedback() {
         const printableCorrect = q.correctAnswer;
 
         card.querySelectorAll('input[type="radio"]').forEach(r => r.disabled = true);
-        exp.style.display = 'block';
+        if(exp) exp.style.display = 'block';
 
         if(selected === cleanedCorrect) {
-            card.classList.add('eval-correct');
+            card.className = 'question-card eval-correct';
             fb.innerHTML = `<span style="color:var(--accent-success);"><i class="fas fa-check-circle"></i> Correct!</span>`;
         } else if(!selected) {
-            card.classList.add('eval-unanswered');
+            card.className = 'question-card eval-unanswered';
             fb.innerHTML = `<span style="color:var(--accent-warning);"><i class="fas fa-exclamation-triangle"></i> Unanswered. Correct answer: ${printableCorrect}</span>`;
         } else {
-            card.classList.add('eval-incorrect');
+            card.className = 'question-card eval-incorrect';
             fb.innerHTML = `<span style="color:var(--danger-text);"><i class="fas fa-times-circle"></i> Incorrect. Correct answer: ${printableCorrect}</span>`;
         }
     });
 
-    scoreText.textContent = `Score: ${quizState.score} / ${quizState.activeQuestions.length}`;
-    const m = Math.floor(quizState.elapsedSeconds / 60); const s = quizState.elapsedSeconds % 60;
-    timeText.textContent = `Time elapsed: ${m} Minutes ${s} Seconds`;
-    resultsContainer.style.display = 'block';
-    submitBtn.disabled = true;
+    if(scoreText) scoreText.textContent = `Score: ${quizState.score} / ${quizState.activeQuestions.length}`;
+    if(timeText) {
+        const m = Math.floor(quizState.elapsedSeconds / 60); const s = quizState.elapsedSeconds % 60;
+        timeText.textContent = `Time elapsed: ${m} Minutes ${s} Seconds`;
+    }
+    if(resultsContainer) resultsContainer.style.display = 'block';
+    if(submitBtn) submitBtn.disabled = true;
     window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
 }
 
@@ -792,17 +835,19 @@ function resetQuizEnv() {
     document.body.style.overflow = '';
     quizState = { topic: '', activeQuestions: [], selections: {}, submitted: false, score: 0, elapsedSeconds: 0, isLocked: false };
     
-    quizContainer.style.display = 'none'; controls.style.display = 'none';
-    resultsContainer.style.display = 'none'; progressWrapper.style.display = 'none';
-    floatingTimerControls.style.display = 'none'; quizOverlay.style.display = 'none';
-    landingPage.style.display = 'block'; submitBtn.disabled = false;
+    quizContainer.style.display = 'none'; if(controls) controls.style.display = 'none';
+    if(resultsContainer) resultsContainer.style.display = 'none'; if(progressWrapper) progressWrapper.style.display = 'none';
+    if(floatingTimerControls) floatingTimerControls.style.display = 'none'; if(quizOverlay) quizOverlay.style.display = 'none';
+    if(landingPage) landingPage.style.display = 'block'; if(submitBtn) submitBtn.disabled = false;
 }
 
-resetQuizBtn.onclick = () => {
-    if(confirm("Reset quiz and return to the main menu?")) {
-        resetQuizEnv(); triggerHUDToast("Quiz reset successfully.");
-    }
-};
+if(resetQuizBtn) {
+    resetQuizBtn.onclick = () => {
+        if(confirm("Reset quiz and return to the main menu?")) {
+            resetQuizEnv(); triggerHUDToast("Quiz reset successfully.");
+        }
+    };
+}
 
 function saveQuizToLocalStorage() { localStorage.setItem(LOCAL_STORAGE_KEY_QUIZ, JSON.stringify(quizState)); }
 
@@ -812,82 +857,79 @@ function loadQuizFromLocalStorage() {
     try {
         const parsed = JSON.parse(raw);
         if(parsed && parsed.activeQuestions && parsed.activeQuestions.length > 0) {
-            quizState = parsed; landingPage.style.display = 'none';
-            quizContainer.style.display = 'block'; controls.style.display = 'block';
+            quizState = parsed; if(landingPage) landingPage.style.display = 'none';
+            quizContainer.style.display = 'block'; if(controls) controls.style.display = 'block';
             
             renderQuizStructure();
             
             if(!quizState.submitted) {
-                progressWrapper.style.display = 'block'; updateQuizProgressBarHUD(); beginQuizTimer();
+                if(progressWrapper) progressWrapper.style.display = 'block'; 
+                updateQuizProgressBarHUD(); 
+                beginQuizTimer();
                 if(quizState.isLocked) { quizOverlay.style.display = 'flex'; document.body.style.overflow = 'hidden'; }
             } else { applyQuizEvaluationFeedback(); }
         }
     } catch(e) { console.error("Error loading saved quiz.", e); }
 }
 
-downloadPdfBtn.onclick = () => {
-    if(quizState.activeQuestions.length === 0) return;
-    triggerHUDToast("Generating PDF summary...");
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 40; let currentY = 50;
-
-    function checkPageBreak(neededHeight) {
-        if (currentY + neededHeight > pageHeight - margin) { doc.addPage(); currentY = margin; }
-    }
-
-    function parsePdfText(text, size, isBold, colorRGB, indent = 0) {
-        doc.setFont("Helvetica", isBold ? "bold" : "normal");
-        doc.setFontSize(size);
-        if (colorRGB) doc.setTextColor(colorRGB[0], colorRGB[1], colorRGB[2]);
-        else doc.setTextColor(20, 20, 20);
-        const lines = doc.splitTextToSize(text, pageWidth - (margin * 2) - indent);
-        checkPageBreak(lines.length * (size * 1.2));
-        lines.forEach(line => { doc.text(line, margin + indent, currentY + size); currentY += size * 1.2; });
-        currentY += 5;
-    }
-
-    const reportTitle = quizState.topic ? `${quizState.topic} Quiz Summary` : "Quiz Summary Report";
-    parsePdfText(reportTitle, 18, true); currentY += 10;
-
-    if (quizState.submitted) {
-        parsePdfText(`Score: ${quizState.score} / ${quizState.activeQuestions.length}`, 13, true, [16, 185, 129]);
-        const m = Math.floor(quizState.elapsedSeconds / 60); const s = quizState.elapsedSeconds % 60;
-        parsePdfText(`Time Taken: ${m} Minutes ${s} Seconds`, 11, false, [100, 100, 100]); currentY += 15;
-    }
-
-    quizState.activeQuestions.forEach((q, idx) => {
-        checkPageBreak(40); parsePdfText(`Q${idx + 1}: ${q.questionText}`, 12, true);
-        q.options.forEach((opt) => { parsePdfText(`• ${opt.trim()}`, 11, false, null, 15); });
-        if(quizState.submitted) {
-            const selected = quizState.selections[idx];
-            const cleanedCorrect = cleanTextForComparison(q.correctAnswer);
-            
-            // Re-find original text matching criteria for presentation
-            const matchOpt = q.options.find(o => cleanTextForComparison(o) === selected) || selected;
-            
-            if (selected === cleanedCorrect) { parsePdfText(`Your Answer: Correct`, 11, true, [16, 185, 129], 15); }
-            else if (selected) { parsePdfText(`Your Answer: Incorrect`, 11, true, [248, 81, 73], 15); parsePdfText(`Correct Answer: ${q.correctAnswer}`, 11, true, [16, 185, 129], 15); }
-            else { parsePdfText(`Your Answer: [Not Answered]`, 11, true, [245, 158, 11], 15); parsePdfText(`Correct Answer: ${q.correctAnswer}`, 11, true, [16, 185, 129], 15); }
-            parsePdfText(`Explanation: ${q.explanation}`, 11, false, [100,100,100], 15);
+if(downloadPdfBtn) {
+    downloadPdfBtn.onclick = () => {
+        if(quizState.activeQuestions.length === 0) return;
+        triggerHUDToast("Generating PDF summary...");
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const margin = 40; let currentY = 50;
+    
+        function checkPageBreak(neededHeight) {
+            if (currentY + neededHeight > pageHeight - margin) { doc.addPage(); currentY = margin; }
         }
-        currentY += 15;
-    });
+    
+        function parsePdfText(text, size, isBold, colorRGB, indent = 0) {
+            doc.setFont("Helvetica", isBold ? "bold" : "normal");
+            doc.setFontSize(size);
+            if (colorRGB) doc.setTextColor(colorRGB[0], colorRGB[1], colorRGB[2]);
+            else doc.setTextColor(20, 20, 20);
+            const lines = doc.splitTextToSize(text, pageWidth - (margin * 2) - indent);
+            checkPageBreak(lines.length * (size * 1.2));
+            lines.forEach(line => { doc.text(line, margin + indent, currentY + size); currentY += size * 1.2; });
+            currentY += 5;
+        }
+    
+        const reportTitle = quizState.topic ? `${quizState.topic} Quiz Summary` : "Quiz Summary Report";
+        parsePdfText(reportTitle, 18, true); currentY += 10;
+    
+        if (quizState.submitted) {
+            parsePdfText(`Score: ${quizState.score} / ${quizState.activeQuestions.length}`, 13, true, [16, 185, 129]);
+            const m = Math.floor(quizState.elapsedSeconds / 60); const s = quizState.elapsedSeconds % 60;
+            parsePdfText(`Time Taken: ${m} Minutes ${s} Seconds`, 11, false, [100, 100, 100]); currentY += 15;
+        }
+    
+        quizState.activeQuestions.forEach((q, idx) => {
+            checkPageBreak(40); parsePdfText(`Q${idx + 1}: ${q.questionText}`, 12, true);
+            q.options.forEach((opt) => { parsePdfText(`• ${opt.trim()}`, 11, false, null, 15); });
+            if(quizState.submitted) {
+                const selected = quizState.selections[idx];
+                const cleanedCorrect = cleanTextForComparison(q.correctAnswer);
+                if (selected === cleanedCorrect) { parsePdfText(`Your Answer: Correct`, 11, true, [16, 185, 129], 15); }
+                else if (selected) { parsePdfText(`Your Answer: Incorrect`, 11, true, [248, 81, 73], 15); parsePdfText(`Correct Answer: ${q.correctAnswer}`, 11, true, [16, 185, 129], 15); }
+                else { parsePdfText(`Your Answer: [Not Answered]`, 11, true, [245, 158, 11], 15); parsePdfText(`Correct Answer: ${q.correctAnswer}`, 11, true, [16, 185, 129], 15); }
+                parsePdfText(`Explanation: ${q.explanation}`, 11, false, [100,100,100], 15);
+            }
+            currentY += 15;
+        });
+    
+        const fileName = quizState.topic ? `${quizState.topic.replace(/[^a-zA-Z0-9]/g, '_')}_Quiz.pdf` : 'Quiz_Summary.pdf';
+        doc.save(fileName);
+        triggerHUDToast("PDF downloaded successfully.");
+    };
+}
 
-    const fileName = quizState.topic ? `${quizState.topic.replace(/[^a-zA-Z0-9]/g, '_')}_Quiz.pdf` : 'Quiz_Summary.pdf';
-    doc.save(fileName);
-    triggerHUDToast("PDF downloaded successfully.");
-};
-
-// --- Init ---
+// --- Init & Event Hookups ---
 document.addEventListener('DOMContentLoaded', () => {
     updateDateHeader();
     loadQuizFromLocalStorage();
-    
-    // Restore the user's last open tab configuration
-    restoreLastActiveTab();
     
     document.addEventListener('click', () => { 
         document.querySelectorAll('.action-menu-dropdown.show').forEach(d => d.classList.remove('show')); 
