@@ -495,7 +495,7 @@ function handleArcHoverIn(e) {
     infoLabel.textContent = target.label;
     infoTime.textContent = `${formatTime(target.startH, target.startM)} - ${formatTime(target.endH, target.endM)}`;
     arcInfoTooltip.classList.add('show');
-  setTimeout(() => arcInfoTooltip.classList.remove('show'), 3500);
+  setTimeout(() => arcInfoTooltip.classList.remove('show'), 1500);
 }
 function handleArcHoverMove(e) { arcInfoTooltip.style.left = `${e.clientX}px`; arcInfoTooltip.style.top = `${e.clientY}px`; }
 function handleArcHoverOut() { arcInfoTooltip.classList.remove('show'); }
