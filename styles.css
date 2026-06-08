@@ -271,11 +271,7 @@ svg.chart {
     z-index: 1 !important;
 }
 
-.timeline-row:hover {
-    background: var(--glass-bg-hover);
-    
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-}
+
 
 .timeline-row.active-current {
     border-color: rgba(62, 145, 255, 0.2);
