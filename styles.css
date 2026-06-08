@@ -305,7 +305,7 @@ svg.chart {
 /* --- UPDATED DROPDOWN MENU FIXES --- */
 .action-menu-dropdown {
     position: absolute; top: 100%; right: 0; 
-    background: var(--glass-bg); 
+    background: var(--bg-color); 
     backdrop-filter: blur(25px) !important; 
     -webkit-backdrop-filter: blur(25px) !important;
     border: 1px solid var(--border-color); border-radius: 16px; padding: 6px; display: none;
