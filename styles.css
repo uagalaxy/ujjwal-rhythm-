@@ -273,7 +273,7 @@ svg.chart {
 
 .timeline-row:hover {
     background: var(--glass-bg-hover);
-    transform: translateY(-2px);
+    
     box-shadow: 0 4px 15px rgba(0,0,0,0.1);
 }
 
@@ -304,7 +304,7 @@ svg.chart {
 .action-menu-dropdown {
     position: absolute; top: 100%; right: 0; background: var(--glass-bg); backdrop-filter: blur(25px) !important;
     border: 1px solid var(--border-color); border-radius: 16px; padding: 6px; display: none;
-    flex-direction: column; gap: 4px;z-index: 2000 !important; min-width: 130px; z-index: 200; box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    flex-direction: column; gap: 4px;z-index: 2000 !important; min-width: 130px;  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
 }
 .action-menu-dropdown.show { display: flex;}
 .action-menu-dropdown button {
