@@ -57,20 +57,11 @@ themeToggleBtn.addEventListener('click', () => {
 });
 
 // --- Tab Persistence Management ---
-/**
- * Saves the active tab target identifier to localStorage
- * @param {string} tabName - 'activity' or 'quiz'
- */
 function persistActiveTab(tabName) {
     localStorage.setItem(LOCAL_STORAGE_KEY_TAB, tabName);
 }
 
-/**
- * Reads localStorage and automatically invokes switchTab to restore state
- * Enforces strict blocking if no user session context is active.
- */
 function restoreLastActiveTab() {
-    // Only parse and display tab configurations if an active session profile exists
     if (!currentUser) {
         hideAuthenticatedUI();
         return;
@@ -139,7 +130,6 @@ logoutBtn.addEventListener('click', () => {
             routinesUnsubscribe();
             routinesUnsubscribe = null;
         }
-        // Purge all persistent security handles and locally mirrored objects
         localStorage.removeItem(LOCAL_STORAGE_KEY_USER);
         localStorage.removeItem(LOCAL_STORAGE_KEY_ROUTINES);
         localStorage.removeItem(LOCAL_STORAGE_KEY_TAB);
@@ -163,7 +153,6 @@ onAuthStateChanged(auth, (user) => {
             photoURL: user.photoURL
         };
         
-        // Cache the verified user object snapshot offline
         localStorage.setItem(LOCAL_STORAGE_KEY_USER, JSON.stringify(minimalUser));
         currentUser = minimalUser;
         
@@ -175,7 +164,6 @@ onAuthStateChanged(auth, (user) => {
         syncRoutines();
         fetchGeminiKey();
     } else {
-        // Fallback safety check if LocalStorage simulation ran but remote token expired
         localStorage.removeItem(LOCAL_STORAGE_KEY_USER);
         localStorage.removeItem(LOCAL_STORAGE_KEY_ROUTINES);
         currentUser = null;
@@ -229,7 +217,6 @@ function syncRoutines() {
             const data = snapshot.val();
             currentScheduleData = Object.values(data).filter(item => item && typeof item === 'object' && item.id);
             currentScheduleData.sort((a,b) => (a.startH * 60 + a.startM) - (b.startH * 60 + b.startM));
-            // Save routines offline instantly for lightning fast local reloads
             localStorage.setItem(LOCAL_STORAGE_KEY_ROUTINES, JSON.stringify(currentScheduleData));
         } else {
             currentScheduleData = [];
@@ -418,7 +405,9 @@ function updateActiveRoutineBar() {
         if(item) {
             const status = getRoutineStatus(item, currentMinutes);
             const pill = row.querySelector('.status-pill');
-            row.className = `timeline-row ${status === 'now' ? 'active-current' : ''}`;
+            // Keep menu-open class if it exists while updating active status
+            const hasMenu = row.classList.contains('menu-open') ? 'menu-open' : '';
+            row.className = `timeline-row ${status === 'now' ? 'active-current' : ''} ${hasMenu}`;
             if(pill) {
                 pill.className = `status-pill ${status}`;
                 pill.innerHTML = status === 'now' ? '<i class="fas fa-spinner fa-spin" style="margin-right:4px;"></i> Active Now' : (status === 'done' ? 'Completed' : 'Upcoming');
@@ -475,12 +464,25 @@ function createScheduleTable() {
         const menuBtn = row.querySelector('.action-menu-btn');
         const dropdown = row.querySelector('.action-menu-dropdown');
         
+        // --- UPDATED DROPDOWN MENU LOGIC ---
         menuBtn.onclick = (e) => {
             e.stopPropagation(); 
+            
+            // Remove elevated z-index from all rows
+            document.querySelectorAll('.timeline-row').forEach(r => {
+                r.classList.remove('menu-open');
+            });
+
+            // Close all other dropdowns
             document.querySelectorAll('.action-menu-dropdown.show').forEach(d => {
                 if (d !== dropdown) d.classList.remove('show');
             });
-            dropdown.classList.toggle('show');
+
+            // Toggle this dropdown and elevate its parent row
+            const isShowing = dropdown.classList.toggle('show');
+            if (isShowing) {
+                row.classList.add('menu-open');
+            }
         };
 
         row.querySelector('.edit-btn').onclick = () => editActivity(item);
@@ -929,16 +931,13 @@ document.addEventListener('DOMContentLoaded', () => {
     updateDateHeader();
     loadQuizFromLocalStorage();
     
-    // Check for cached user credentials to immediately suppress login screen flicker
     const cachedUserRaw = localStorage.getItem(LOCAL_STORAGE_KEY_USER);
     if (cachedUserRaw) {
         try {
             currentUser = JSON.parse(cachedUserRaw);
-            // Instant display initialization before Firebase Auth resolves over HTTP
             showAuthenticatedUI(currentUser);
             restoreLastActiveTab();
             
-            // Pop cached routines onto components immediately for zero-delay interface generation
             const cachedRoutinesRaw = localStorage.getItem(LOCAL_STORAGE_KEY_ROUTINES);
             if (cachedRoutinesRaw) {
                 currentScheduleData = JSON.parse(cachedRoutinesRaw);
@@ -953,7 +952,11 @@ document.addEventListener('DOMContentLoaded', () => {
         hideAuthenticatedUI();
     }
     
+    // --- UPDATED GLOBAL CLICK LISTENER ---
     document.addEventListener('click', () => { 
+        // Close dropdowns
         document.querySelectorAll('.action-menu-dropdown.show').forEach(d => d.classList.remove('show')); 
+        // Reset row z-indexes
+        document.querySelectorAll('.timeline-row').forEach(r => r.classList.remove('menu-open'));
     });
 });
