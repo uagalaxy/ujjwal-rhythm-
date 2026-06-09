@@ -902,9 +902,15 @@ downloadPdfBtn.onclick = () => {
         doc.setPage(i);
         
         // 1. Center Diagonal Watermark (Light Grey background layer)
-        doc.setFontSize(65);
+        doc.setFontSize(30);
         doc.setTextColor(243, 243, 246); 
-        doc.text("uRhythm", pageWidth / 2, pageHeight / 2, { align: "center", angle: 45 });
+        doc.text("uRhythm.vercel.app", pageWidth / 2, pageHeight / 2, { align: "center", angle: 45 });
+doc.setFontSize(30);
+        doc.setTextColor(243, 243, 246); 
+        doc.text("uRhythm.vercel.app", pageWidth / 2, pageHeight / 1.3, { align: "center", angle: 45 });
+doc.setFontSize(30);
+        doc.setTextColor(243, 243, 246); 
+        doc.text("uRhythm.vercel.app", pageWidth / 2, pageHeight / 2.7, { align: "center", angle: 45 });
 
         // 2. Clear Footer Identification & Hyperlink Watermark
         doc.setFontSize(8.5);
@@ -912,6 +918,8 @@ downloadPdfBtn.onclick = () => {
         const footerText = "Generated via uRhythm (urhythm.vercel.app)  |  Developer: Ujjwal Ravi (ujjwalravi.vercel.app)";
         doc.text(footerText, pageWidth / 2, pageHeight - 20, { align: "center" });
     }
+  
+
     // --- Render Questions Down Columns (Newspaper Layout) ---
     quizState.activeQuestions.forEach((q, idx) => {
         // Step 1: Pre-calculate the exact height needed for this specific question block
