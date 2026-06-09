@@ -897,7 +897,21 @@ downloadPdfBtn.onclick = () => {
         doc.setFont("Helvetica", "normal");
         doc.text(`Time Taken: ${m} Min ${s} Sec`, margin + 120, margin + 30);
     }
+     const totalPages = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        
+        // 1. Center Diagonal Watermark (Light Grey background layer)
+        doc.setFontSize(65);
+        doc.setTextColor(243, 243, 246); 
+        doc.text("uRhythm", pageWidth / 2, pageHeight / 2, { align: "center", angle: 45 });
 
+        // 2. Clear Footer Identification & Hyperlink Watermark
+        doc.setFontSize(8.5);
+        doc.setTextColor(140, 140, 145);
+        const footerText = "Generated via uRhythm (urhythm.vercel.app)  |  Developer: Ujjwal Ravi (ujjwalravi.vercel.app)";
+        doc.text(footerText, pageWidth / 2, pageHeight - 20, { align: "center" });
+    }
     // --- Render Questions Down Columns (Newspaper Layout) ---
     quizState.activeQuestions.forEach((q, idx) => {
         // Step 1: Pre-calculate the exact height needed for this specific question block
@@ -972,21 +986,7 @@ downloadPdfBtn.onclick = () => {
     });
 
     // --- Dynamic Watermarks on ALL Generated Pages ---
-    const totalPages = doc.internal.getNumberOfPages();
-    for (let i = 1; i <= totalPages; i++) {
-        doc.setPage(i);
-        
-        // 1. Center Diagonal Watermark (Light Grey background layer)
-        doc.setFontSize(65);
-        doc.setTextColor(243, 243, 246); 
-        doc.text("uRhythm", pageWidth / 2, pageHeight / 2, { align: "center", angle: 45 });
-
-        // 2. Clear Footer Identification & Hyperlink Watermark
-        doc.setFontSize(8.5);
-        doc.setTextColor(140, 140, 145);
-        const footerText = "Generated via uRhythm (urhythm.vercel.app)  |  Developer: Ujjwal Ravi (ujjwalravi.vercel.app)";
-        doc.text(footerText, pageWidth / 2, pageHeight - 20, { align: "center" });
-    }
+    
 
     // Save File
     const fileName = quizState.topic ? `${quizState.topic.replace(/[^a-zA-Z0-9]/g, '_')}_Quiz.pdf` : 'Quiz_Summary.pdf';
