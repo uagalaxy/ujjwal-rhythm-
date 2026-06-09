@@ -464,7 +464,7 @@ button:disabled { opacity: 0.4; transform: none !important; }
 
 .timer-badge {
     position: fixed; top: 20px; right: 20px; background: var(--glass-bg); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
-    border: 1px solid var(--border-color); padding: 10px 10px; border-radius: 20px; filter: invert(1);
+    border: 1px solid var(--border-color); padding: 10px 10px; border-radius: 20px; 
     display: none; align-items: center; gap: 12px; font-weight: 600; font-size: 0.9rem; z-index: 1500; box-shadow: 0 4px 20px rgba(0,0,0,0.1);
 }
 .timer-badge button { margin-top:5px; padding: 6px 12px; font-size: 0.75rem; border-radius: 12px; }
