@@ -1,6 +1,6 @@
 {
-  "name": "rhythm: routine & AI quiz practice",
-  "short_name": "rhythm",  
+  "name": "uRhythm: routine & AI quiz practice",
+  "short_name": "uRhythm",  
   "description": "Generate and practice objective questions on various topics.",
   "start_url": "index.html",
   "display": "#fff",
