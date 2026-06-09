@@ -48,7 +48,7 @@
         <h3 style="margin-top: 0; font-size: 1.1rem;">Direct Links</h3>
         <p style="font-size: 0.9rem; color: var(--text-muted);">
             Email: <a href="mailto:maakasamindian@gmail.com" style="color: var(--accent-color);">maakasamindian@gmail.com</a><br>
-            Website: <a href="https://ujjwalravi.vercel.app" target="_blank" style="color: var(--accent-color);">uagalaxy.netlify.app/uasocial</a>
+            Website: <a href="https://ujjwalravi.vercel.app" target="_blank" style="color: var(--accent-color);">ujjwalravi.vercel.app</a>
         </p>
     </div>
 
@@ -57,8 +57,8 @@
     </footer>
 
     <script>
-        const dark =localStorage.getItem('theme') !== 'dark'
-        document.body.setAttribute('data-theme', 'dark');
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
     </script>
 </body>
 </html>
