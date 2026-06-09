@@ -57,8 +57,8 @@
     </footer>
 
     <script>
-        const savedTheme = localStorage.getItem('theme_preference') || 'light';
-        document.documentElement.setAttribute('data-theme', savedTheme);
+        const dark =localStorage.getItem('theme') !== 'dark'
+        document.body.setAttribute('data-theme', 'dark');
     </script>
 </body>
 </html>
