@@ -1,9 +1,7 @@
-// --- Firebase v10 Modular SDK Imports ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { getDatabase, ref, set, onValue, get, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
   apiKey: "AIzaSyDoVWb4rxNm5Urf85vPiuRzXm5S2f1U_oA",
   authDomain: "ujjwal-rhythm.firebaseapp.com",
@@ -15,12 +13,10 @@ const firebaseConfig = {
   measurementId: "G-XRGXZZQ5TE"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
 
-// --- Global App State & Local Storage Keys ---
 const LOCAL_STORAGE_KEY_QUIZ = 'dailyRhythmSelfQuizState';
 const LOCAL_STORAGE_KEY_TAB = 'dailyRhythmLastActiveTab';
 const LOCAL_STORAGE_KEY_USER = 'dailyRhythmCachedUser';
@@ -32,20 +28,19 @@ let currentUser = null;
 let userGeminiApiKey = null;
 let routinesUnsubscribe = null; 
 
-// --- Theme Management ---
 const themeToggleBtn = document.getElementById('theme-toggle-btn');
 const themeMeta = document.getElementById('theme-color-meta');
-let isLightMode = localStorage.getItem('theme') === 'light';
+let isLightMode = localStorage.getItem('theme') !== 'dark'; 
 
 function applyTheme() {
-    if (isLightMode) {
-        document.body.setAttribute('data-theme', 'light');
-        themeToggleBtn.innerHTML = '<i class="fas fa-moon"></i> Theme';
-        themeMeta.setAttribute('content', '#F2F2F7');
-    } else {
-        document.body.removeAttribute('data-theme');
+    if (!isLightMode) {
+        document.body.setAttribute('data-theme', 'dark');
         themeToggleBtn.innerHTML = '<i class="fas fa-sun"></i> Theme';
         themeMeta.setAttribute('content', '#000000');
+    } else {
+        document.body.removeAttribute('data-theme');
+        themeToggleBtn.innerHTML = '<i class="fas fa-moon"></i> Theme';
+        themeMeta.setAttribute('content', '#F2F2F7');
     }
 }
 applyTheme(); 
@@ -56,7 +51,26 @@ themeToggleBtn.addEventListener('click', () => {
     applyTheme();
 });
 
-// --- Tab Persistence Management ---
+let deferredPrompt;
+const installBtn = document.getElementById('pwa-install-btn');
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    if(!window.matchMedia('(display-mode: standalone)').matches) {
+        installBtn.style.display = 'inline-flex';
+    }
+});
+installBtn.addEventListener('click', async () => {
+    if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') installBtn.style.display = 'none';
+        deferredPrompt = null;
+    }
+});
+window.addEventListener('appinstalled', () => installBtn.style.display = 'none');
+if(window.matchMedia('(display-mode: standalone)').matches) installBtn.style.display = 'none';
+
 function persistActiveTab(tabName) {
     localStorage.setItem(LOCAL_STORAGE_KEY_TAB, tabName);
 }
@@ -66,16 +80,14 @@ function restoreLastActiveTab() {
         hideAuthenticatedUI();
         return;
     }
-
     const lastTab = localStorage.getItem(LOCAL_STORAGE_KEY_TAB);
-    if (lastTab === 'quiz') {
-        switchTab('quiz');
-    } else {
+    if (lastTab === 'activity') {
         switchTab('activity');
+    } else {
+        switchTab('quiz');
     }
 }
 
-// --- Auth UI Elements ---
 const loginSection = document.getElementById('login-section');
 const mainTabs = document.getElementById('main-tabs');
 const activitySection = document.getElementById('activity-section');
@@ -83,18 +95,15 @@ const googleLoginBtn = document.getElementById('google-login-btn');
 const logoutBtn = document.getElementById('logout-btn');
 const userAvatar = document.getElementById('user-avatar');
 
-// API Key Elements
 const apiKeyModal = document.getElementById('api-key-modal');
 const settingsBtn = document.getElementById('settings-btn');
 const closeApiKeyBtn = document.getElementById('close-api-key-btn');
 const saveApiKeyBtn = document.getElementById('save-api-key-btn');
 const geminiApiKeyInput = document.getElementById('gemini-api-key-input');
 
-// --- Offline & UI State Sync Modules ---
 function showAuthenticatedUI(userObj) {
     loginSection.classList.remove('active');
     mainTabs.style.display = 'flex';
-    
     userAvatar.src = userObj.photoURL || '';
     userAvatar.style.display = 'block';
     logoutBtn.style.display = 'flex';
@@ -105,23 +114,17 @@ function hideAuthenticatedUI() {
     loginSection.classList.add('active');
     activitySection.classList.remove('active');
     document.getElementById('quiz-section').classList.remove('active');
-    
     activitySection.style.display = 'none';
     document.getElementById('quiz-section').style.display = 'none';
     mainTabs.style.display = 'none';
-    
     userAvatar.style.display = 'none';
     logoutBtn.style.display = 'none';
     settingsBtn.style.display = 'none';
 }
 
-// --- Auth Logic ---
 googleLoginBtn.addEventListener('click', () => {
     const provider = new GoogleAuthProvider();
-    signInWithPopup(auth, provider).catch((error) => {
-        console.error("Login Error:", error);
-        triggerHUDToast("Login failed. Try again.");
-    });
+    signInWithPopup(auth, provider).catch(() => triggerHUDToast("Login failed. Try again."));
 });
 
 logoutBtn.addEventListener('click', () => {
@@ -133,11 +136,9 @@ logoutBtn.addEventListener('click', () => {
         localStorage.removeItem(LOCAL_STORAGE_KEY_USER);
         localStorage.removeItem(LOCAL_STORAGE_KEY_ROUTINES);
         localStorage.removeItem(LOCAL_STORAGE_KEY_TAB);
-        
         currentUser = null;
         userGeminiApiKey = null;
         currentScheduleData = [];
-        
         resetQuizEnv();
         drawChart();
         createScheduleTable();
@@ -147,20 +148,12 @@ logoutBtn.addEventListener('click', () => {
 
 onAuthStateChanged(auth, (user) => {
     if (user) {
-        const minimalUser = {
-            uid: user.uid,
-            displayName: user.displayName,
-            photoURL: user.photoURL
-        };
-        
+        const minimalUser = { uid: user.uid, displayName: user.displayName, photoURL: user.photoURL };
         localStorage.setItem(LOCAL_STORAGE_KEY_USER, JSON.stringify(minimalUser));
         currentUser = minimalUser;
-        
         showAuthenticatedUI(currentUser);
         restoreLastActiveTab();
-        
         triggerHUDToast(`Welcome, ${user.displayName.split(' ')[0]}!`);
-        
         syncRoutines();
         fetchGeminiKey();
     } else {
@@ -172,7 +165,6 @@ onAuthStateChanged(auth, (user) => {
     }
 });
 
-// --- API Key Management ---
 function fetchGeminiKey() {
     if (!currentUser) return;
     const keyRef = ref(db, `users/${currentUser.uid}/geminiKey`);
@@ -189,7 +181,6 @@ settingsBtn.onclick = () => {
     if(userGeminiApiKey) geminiApiKeyInput.value = userGeminiApiKey;
     apiKeyModal.classList.add('show');
 };
-
 closeApiKeyBtn.onclick = () => apiKeyModal.classList.remove('show');
 
 saveApiKeyBtn.onclick = () => {
@@ -203,13 +194,9 @@ saveApiKeyBtn.onclick = () => {
     }
 };
 
-// --- Routine Firebase Syncing ---
 function syncRoutines() {
     if (!currentUser) return;
-    if (routinesUnsubscribe) {
-        routinesUnsubscribe();
-    }
-
+    if (routinesUnsubscribe) routinesUnsubscribe();
     const routinesRef = ref(db, `users/${currentUser.uid}/routines`);
     
     routinesUnsubscribe = onValue(routinesRef, (snapshot) => {
@@ -222,13 +209,11 @@ function syncRoutines() {
             currentScheduleData = [];
             localStorage.removeItem(LOCAL_STORAGE_KEY_ROUTINES);
         }
-        
         createScheduleTable();
         drawChart();
     });
 }
 
-// --- SVG & Chart Variables ---
 const svgNS = "http://www.w3.org/2000/svg";
 const cx = 50; const cy = 50; const radius = 45;
 const strokeWidth = 9;
@@ -240,7 +225,6 @@ const centerActivityLabel = document.getElementById('center-activity-label');
 const addActivityButton = document.getElementById('add-activity-button');
 const timelineContainer = document.getElementById('timeline-container');
 
-// Routine Form Modal
 const activityModal = document.getElementById('activity-modal');
 const activityForm = document.getElementById('activity-form');
 const activityIdInput = document.getElementById('activity-id');
@@ -251,7 +235,6 @@ const saveButton = document.getElementById('save-button');
 const cancelEditButton = document.getElementById('cancel-edit-button');
 const formTitle = document.getElementById('form-title');
 
-// Tooltip & Tabs
 const arcInfoTooltip = document.getElementById('arc-info-tooltip');
 const infoLabel = arcInfoTooltip.querySelector('.info-label');
 const infoTime = arcInfoTooltip.querySelector('.info-time');
@@ -260,11 +243,9 @@ const activityTabBtn = document.getElementById('activity-tab-btn');
 const quizTabBtn = document.getElementById('quiz-tab-btn');
 const quizSection = document.getElementById('quiz-section');
 
-// Quiz State
 let quizState = { topic: '', activeQuestions: [], selections: {}, submitted: false, score: 0, elapsedSeconds: 0, isLocked: false };
 let quizTimerInterval = null;
 
-// Quiz Elements
 const landingPage = document.getElementById('landingPage');
 const loadingIndicator = document.getElementById('loadingIndicator');
 const startQuizBtn = document.getElementById('startQuizBtn');
@@ -287,7 +268,6 @@ const overlayResumeBtn = document.getElementById('overlayResumeBtn');
 const progressWrapper = document.getElementById('progressWrapper');
 const progressBarFill = document.getElementById('progressBarFill');
 
-// --- Helper Functions ---
 function generateUniqueId() { return Date.now().toString(36) + Math.random().toString(36).substring(2, 7); }
 function getRandomLightColor() { const hue = Math.floor(Math.random() * 360); return `hsl(${hue}, 75%, 70%)`; }
 function triggerHUDToast(msg) {
@@ -322,7 +302,6 @@ function updateDateHeader() {
     dateDayHeader.textContent = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-// --- Chart Drawing ---
 function drawChart() {
     svgChart.innerHTML = '';
     const bgCircle = document.createElementNS(svgNS, 'circle');
@@ -465,19 +444,12 @@ function createScheduleTable() {
         
         menuBtn.onclick = (e) => {
             e.stopPropagation(); 
-            
-            document.querySelectorAll('.timeline-row').forEach(r => {
-                r.classList.remove('menu-open');
-            });
-
+            document.querySelectorAll('.timeline-row').forEach(r => r.classList.remove('menu-open'));
             document.querySelectorAll('.action-menu-dropdown.show').forEach(d => {
                 if (d !== dropdown) d.classList.remove('show');
             });
-
             const isShowing = dropdown.classList.toggle('show');
-            if (isShowing) {
-                row.classList.add('menu-open');
-            }
+            if (isShowing) row.classList.add('menu-open');
         };
 
         row.querySelector('.edit-btn').onclick = () => editActivity(item);
@@ -509,12 +481,7 @@ function deleteActivity(id) {
     if(!currentUser) return;
     if(confirm("Delete this activity?")) {
         const routineRef = ref(db, `users/${currentUser.uid}/routines/${id}`);
-        remove(routineRef).then(() => {
-            triggerHUDToast("Activity deleted.");
-        }).catch((error) => {
-            console.error("Delete error:", error);
-            triggerHUDToast("Error deleting activity.");
-        });
+        remove(routineRef).then(() => triggerHUDToast("Activity deleted.")).catch(() => triggerHUDToast("Error deleting activity."));
     }
 }
 
@@ -531,7 +498,6 @@ activityForm.addEventListener('submit', (e) => {
         triggerHUDToast("Please log in to save activities.");
         return;
     }
-
     try {
         const id = activityIdInput.value || generateUniqueId();
         const label = activityLabelInput.value.trim();
@@ -549,25 +515,28 @@ activityForm.addEventListener('submit', (e) => {
         set(routineRef, packed).then(() => {
             activityModal.classList.remove('show'); 
             triggerHUDToast("Activity saved.");
-        }).catch((error) => {
-            console.error("Firebase save error:", error);
-            triggerHUDToast("Failed to save activity.");
-        });
-
+        }).catch(() => triggerHUDToast("Failed to save activity."));
     } catch (error) {
-        console.error("Form parsing error:", error);
         triggerHUDToast("Failed to parse activity.");
     }
 });
 
+function canSwitchTabs() {
+    if (quizState.activeQuestions && quizState.activeQuestions.length > 0 && !quizState.submitted) {
+        triggerHUDToast("Please submit or reset your active quiz first.");
+        return false;
+    }
+    return true;
+}
+
 activityTabBtn.addEventListener('click', () => {
-    if (!currentUser) return;
+    if (!currentUser || !canSwitchTabs()) return;
     switchTab('activity');
     persistActiveTab('activity');
 });
 
 quizTabBtn.addEventListener('click', () => {
-    if (!currentUser) return;
+    if (!currentUser || !canSwitchTabs()) return;
     switchTab('quiz');
     persistActiveTab('quiz');
 });
@@ -593,7 +562,6 @@ function switchTab(target) {
     }
 }
 
-// --- Quiz Logic ---
 function cleanTextForComparison(text) { 
     if (!text) return '';
     return text.toString().replace(/^[a-zA-Z0-9][-.)]\s*/, '').trim().toLowerCase(); 
@@ -609,7 +577,6 @@ startQuizBtn.onclick = () => {
 }
 closeQuizConfigBtn.onclick = () => inputModal.classList.remove('show');
 
-// --- SECURED ROUTE TO SERVERLESS BACKEND WITH ZERO LOCAL EMBEDDED PARSING ---
 generateBtn.addEventListener('click', async () => {
     const topic = document.getElementById('modalTopicInput').value.trim();
     const difficulty = document.getElementById('modalDifficultySelect').value || 'medium';
@@ -626,12 +593,7 @@ generateBtn.addEventListener('click', async () => {
         const response = await fetch('/api/generate-quiz', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                topic,
-                difficulty,
-                numQuestions,
-                userApiKey: userGeminiApiKey
-            })
+            body: JSON.stringify({ topic, difficulty, numQuestions, userApiKey: userGeminiApiKey })
         });
         
         const result = await response.json();
@@ -660,7 +622,6 @@ generateBtn.addEventListener('click', async () => {
             throw new Error("Failed to parse valid questions from AI response.");
         }
     } catch (err) {
-        console.error("Generation Processing Error:", err);
         loadingIndicator.style.display = 'none';
         quizContainer.style.display = 'block';
         quizContainer.innerHTML = `<h3 style="color:var(--danger-text); padding:20px;">Generation Error: ${err.message}</h3>`;
@@ -842,7 +803,7 @@ function loadQuizFromLocalStorage() {
                 if(quizState.isLocked) { quizOverlay.style.display = 'flex'; document.body.style.overflow = 'hidden'; }
             } else { applyQuizEvaluationFeedback(); }
         }
-    } catch(e) { console.error("Error loading saved quiz.", e); }
+    } catch(e) {}
 }
 
 downloadPdfBtn.onclick = () => {
@@ -850,22 +811,19 @@ downloadPdfBtn.onclick = () => {
     triggerHUDToast("Generating PDF summary...");
     const { jsPDF } = window.jspdf;
     
-    // Initialize PDF
     const doc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 40;
     
-    // Column Architecture Settings
     const colGap = 35;
     const colWidth = (pageWidth - (margin * 2) - colGap) / 2;
-    const contentBottomLimit = pageHeight - 50; // Leave space for footer
+    const contentBottomLimit = pageHeight - 50; 
     
-    let currentY = margin + 50; // Start below the main header
+    let currentY = margin + 50; 
     let isLeftCol = true;
     let currentX = margin;
 
-    // --- Helper to measure and print wrapped text inside column bounds ---
     function printWrappedText(text, x, y, size, isBold, colorRGB, maxWidth) {
         doc.setFont("Helvetica", isBold ? "bold" : "normal");
         doc.setFontSize(size);
@@ -873,14 +831,10 @@ downloadPdfBtn.onclick = () => {
         else doc.setTextColor(20, 20, 20);
         
         const lines = doc.splitTextToSize(text, maxWidth);
-        lines.forEach(line => { 
-            doc.text(line, x, y + size); 
-            y += size * 1.2; 
-        });
-        return y + 6; // Returns updated Y pointer coordinate
+        lines.forEach(line => { doc.text(line, x, y + size); y += size * 1.2; });
+        return y + 6; 
     }
 
-    // --- Main Document Headers ---
     const reportTitle = quizState.topic ? `${quizState.topic} Quiz Summary` : "Quiz Summary Report";
     doc.setFont("Helvetica", "bold");
     doc.setFontSize(18);
@@ -897,76 +851,54 @@ downloadPdfBtn.onclick = () => {
         doc.setFont("Helvetica", "normal");
         doc.text(`Time Taken: ${m} Min ${s} Sec`, margin + 120, margin + 30);
     }
-     const totalPages = doc.internal.getNumberOfPages();
+    const totalPages = doc.internal.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i);
-        
-        // 1. Center Diagonal Watermark (Light Grey background layer)
         doc.setFontSize(30);
         doc.setTextColor(243, 243, 246); 
         doc.text("uRhythm.vercel.app", pageWidth / 2, pageHeight / 2, { align: "center", angle: 45 });
-doc.setFontSize(30);
-         // 2. Clear Footer Identification & Hyperlink Watermark
         doc.setFontSize(8.5);
         doc.setTextColor(140, 140, 145);
         const footerText = "Generated via uRhythm (urhythm.vercel.app)  |  Developer: Ujjwal Ravi (ujjwalravi.vercel.app)";
         doc.text(footerText, pageWidth / 2, pageHeight - 20, { align: "center" });
     }
   
-
-    // --- Render Questions Down Columns (Newspaper Layout) ---
     quizState.activeQuestions.forEach((q, idx) => {
-        // Step 1: Pre-calculate the exact height needed for this specific question block
         let neededHeight = 0;
-        
-        // Question lines
         const qLines = doc.splitTextToSize(`Q${idx + 1}: ${q.questionText}`, colWidth);
         neededHeight += qLines.length * (11 * 1.2) + 6;
 
-        // Options lines
         q.options.forEach(opt => {
             const optLines = doc.splitTextToSize(`• ${opt}`, colWidth - 10);
             neededHeight += optLines.length * (10 * 1.2) + 6;
         });
 
-        // Feedback & Explanation lines (if submitted)
         if (quizState.submitted) {
-            neededHeight += (10 * 1.2) + 6; // Space for Your Answer evaluation line
+            neededHeight += (10 * 1.2) + 6; 
             const expLines = doc.splitTextToSize(`Explanation: ${q.explanation}`, colWidth - 10);
             neededHeight += expLines.length * (9 * 1.2) + 6;
         }
 
-        // Add safety spacing margin between blocks
         neededHeight += 20;
 
-        // Step 2: Handle Column and Page Overflow Breaks dynamically
         if (currentY + neededHeight > contentBottomLimit) {
             if (isLeftCol) {
-                // Move from Left Column to Right Column on the SAME page
                 isLeftCol = false;
                 currentX = margin + colWidth + colGap;
-                currentY = margin + 50; // Reset Y back to top of the right column
+                currentY = margin + 50; 
             } else {
-                // Both columns are full! Create a NEW page and reset to Left Column
                 doc.addPage();
                 isLeftCol = true;
                 currentX = margin;
-                currentY = margin + 50; // Reset Y back to top of the left column
+                currentY = margin + 50; 
             }
         }
 
-        // Step 3: Draw the Question Block components
         let blockY = currentY;
 
-        // Render Question Text
         blockY = printWrappedText(`Q${idx + 1}: ${q.questionText}`, currentX, blockY, 11, true, null, colWidth);
-        
-        // Render Options
-        q.options.forEach((opt) => { 
-            blockY = printWrappedText(`• ${opt}`, currentX + 10, blockY, 10, false, null, colWidth - 10); 
-        });
+        q.options.forEach((opt) => { blockY = printWrappedText(`• ${opt}`, currentX + 10, blockY, 10, false, null, colWidth - 10); });
 
-        // Render Evaluation Details
         if(quizState.submitted) {
             const selected = quizState.selections[idx];
             const cleanedCorrect = cleanTextForComparison(q.correctAnswer);
@@ -983,20 +915,14 @@ doc.setFontSize(30);
             blockY = printWrappedText(`Explanation: ${q.explanation}`, currentX + 10, blockY, 9, false, [100, 100, 100], colWidth - 10);
         }
 
-        // Update the Y axis pointer to sit right under this compiled block
         currentY = blockY + 14; 
     });
 
-    // --- Dynamic Watermarks on ALL Generated Pages ---
-    
-
-    // Save File
     const fileName = quizState.topic ? `${quizState.topic.replace(/[^a-zA-Z0-9]/g, '_')}_Quiz.pdf` : 'Quiz_Summary.pdf';
     doc.save(fileName);
     triggerHUDToast("PDF downloaded successfully.");
 };
 
-// --- Init ---
 document.addEventListener('DOMContentLoaded', () => {
     updateDateHeader();
     loadQuizFromLocalStorage();
@@ -1015,7 +941,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 drawChart();
             }
         } catch(e) {
-            console.error("Local storage initialization parsing exception:", e);
             hideAuthenticatedUI();
         }
     } else {
