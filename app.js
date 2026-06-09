@@ -904,13 +904,13 @@ downloadPdfBtn.onclick = () => {
         // 1. Center Diagonal Watermark (Light Grey background layer)
         doc.setFontSize(30);
         doc.setTextColor(243, 243, 246); 
-        doc.text("uRhythm.vercel.app", pageWidth / 2, pageHeight / 0.7, { align: "center", angle: 45 });
-doc.setFontSize(30);
-        doc.setTextColor(243, 243, 246); 
         doc.text("uRhythm.vercel.app", pageWidth / 2, pageHeight / 2, { align: "center", angle: 45 });
 doc.setFontSize(30);
         doc.setTextColor(243, 243, 246); 
-        doc.text("uRhythm.vercel.app", pageWidth / 2, pageHeight / 2.7, { align: "center", angle: 45 });
+        doc.text("uRhythm.vercel.app", pageWidth / 2, pageHeight / 2.4, { align: "center", angle: 45 });
+doc.setFontSize(30);
+        doc.setTextColor(243, 243, 246); 
+        doc.text("uRhythm.vercel.app", pageWidth / 2, pageHeight / 2.8, { align: "center", angle: 45 });
 
         // 2. Clear Footer Identification & Hyperlink Watermark
         doc.setFontSize(8.5);
