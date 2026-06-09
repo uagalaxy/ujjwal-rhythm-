@@ -849,50 +849,146 @@ downloadPdfBtn.onclick = () => {
     if(quizState.activeQuestions.length === 0) return;
     triggerHUDToast("Generating PDF summary...");
     const { jsPDF } = window.jspdf;
+    
+    // Initialize PDF
     const doc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 40; let currentY = 50;
+    const margin = 40;
+    
+    // Column Architecture Settings
+    const colGap = 35;
+    const colWidth = (pageWidth - (margin * 2) - colGap) / 2;
+    const contentBottomLimit = pageHeight - 50; // Leave space for footer
+    
+    let currentY = margin + 50; // Start below the main header
+    let isLeftCol = true;
+    let currentX = margin;
 
-    function checkPageBreak(neededHeight) {
-        if (currentY + neededHeight > pageHeight - margin) { doc.addPage(); currentY = margin; }
-    }
-
-    function parsePdfText(text, size, isBold, colorRGB, indent = 0) {
+    // --- Helper to measure and print wrapped text inside column bounds ---
+    function printWrappedText(text, x, y, size, isBold, colorRGB, maxWidth) {
         doc.setFont("Helvetica", isBold ? "bold" : "normal");
         doc.setFontSize(size);
         if (colorRGB) doc.setTextColor(colorRGB[0], colorRGB[1], colorRGB[2]);
         else doc.setTextColor(20, 20, 20);
-        const lines = doc.splitTextToSize(text, pageWidth - (margin * 2) - indent);
-        checkPageBreak(lines.length * (size * 1.2));
-        lines.forEach(line => { doc.text(line, margin + indent, currentY + size); currentY += size * 1.2; });
-        currentY += 5;
+        
+        const lines = doc.splitTextToSize(text, maxWidth);
+        lines.forEach(line => { 
+            doc.text(line, x, y + size); 
+            y += size * 1.2; 
+        });
+        return y + 6; // Returns updated Y pointer coordinate
     }
 
+    // --- Main Document Headers ---
     const reportTitle = quizState.topic ? `${quizState.topic} Quiz Summary` : "Quiz Summary Report";
-    parsePdfText(reportTitle, 18, true); currentY += 10;
+    doc.setFont("Helvetica", "bold");
+    doc.setFontSize(18);
+    doc.setTextColor(20, 20, 20);
+    doc.text(reportTitle, margin, margin + 10);
 
     if (quizState.submitted) {
-        parsePdfText(`Score: ${quizState.score} / ${quizState.activeQuestions.length}`, 13, true, [16, 185, 129]);
+        doc.setFontSize(11);
+        doc.setTextColor(16, 185, 129);
+        doc.text(`Score: ${quizState.score} / ${quizState.activeQuestions.length}`, margin, margin + 30);
+        
         const m = Math.floor(quizState.elapsedSeconds / 60); const s = quizState.elapsedSeconds % 60;
-        parsePdfText(`Time Taken: ${m} Minutes ${s} Seconds`, 11, false, [100, 100, 100]); currentY += 15;
+        doc.setTextColor(100, 100, 100);
+        doc.setFont("Helvetica", "normal");
+        doc.text(`Time Taken: ${m} Min ${s} Sec`, margin + 120, margin + 30);
     }
 
+    // --- Render Questions Down Columns (Newspaper Layout) ---
     quizState.activeQuestions.forEach((q, idx) => {
-        checkPageBreak(40); parsePdfText(`Q${idx + 1}: ${q.questionText}`, 12, true);
-        q.options.forEach((opt) => { parsePdfText(`• ${opt}`, 11, false, null, 15); });
+        // Step 1: Pre-calculate the exact height needed for this specific question block
+        let neededHeight = 0;
+        
+        // Question lines
+        const qLines = doc.splitTextToSize(`Q${idx + 1}: ${q.questionText}`, colWidth);
+        neededHeight += qLines.length * (11 * 1.2) + 6;
+
+        // Options lines
+        q.options.forEach(opt => {
+            const optLines = doc.splitTextToSize(`• ${opt}`, colWidth - 10);
+            neededHeight += optLines.length * (10 * 1.2) + 6;
+        });
+
+        // Feedback & Explanation lines (if submitted)
+        if (quizState.submitted) {
+            neededHeight += (10 * 1.2) + 6; // Space for Your Answer evaluation line
+            const expLines = doc.splitTextToSize(`Explanation: ${q.explanation}`, colWidth - 10);
+            neededHeight += expLines.length * (9 * 1.2) + 6;
+        }
+
+        // Add safety spacing margin between blocks
+        neededHeight += 20;
+
+        // Step 2: Handle Column and Page Overflow Breaks dynamically
+        if (currentY + neededHeight > contentBottomLimit) {
+            if (isLeftCol) {
+                // Move from Left Column to Right Column on the SAME page
+                isLeftCol = false;
+                currentX = margin + colWidth + colGap;
+                currentY = margin + 50; // Reset Y back to top of the right column
+            } else {
+                // Both columns are full! Create a NEW page and reset to Left Column
+                doc.addPage();
+                isLeftCol = true;
+                currentX = margin;
+                currentY = margin + 50; // Reset Y back to top of the left column
+            }
+        }
+
+        // Step 3: Draw the Question Block components
+        let blockY = currentY;
+
+        // Render Question Text
+        blockY = printWrappedText(`Q${idx + 1}: ${q.questionText}`, currentX, blockY, 11, true, null, colWidth);
+        
+        // Render Options
+        q.options.forEach((opt) => { 
+            blockY = printWrappedText(`• ${opt}`, currentX + 10, blockY, 10, false, null, colWidth - 10); 
+        });
+
+        // Render Evaluation Details
         if(quizState.submitted) {
             const selected = quizState.selections[idx];
             const cleanedCorrect = cleanTextForComparison(q.correctAnswer);
             
-            if (selected === cleanedCorrect) { parsePdfText(`Your Answer: Correct`, 11, true, [16, 185, 129], 15); }
-            else if (selected) { parsePdfText(`Your Answer: Incorrect`, 11, true, [248, 81, 73], 15); parsePdfText(`Correct Answer: ${q.correctAnswer}`, 11, true, [16, 185, 129], 15); }
-            else { parsePdfText(`Your Answer: [Not Answered]`, 11, true, [245, 158, 11], 15); parsePdfText(`Correct Answer: ${q.correctAnswer}`, 11, true, [16, 185, 129], 15); }
-            parsePdfText(`Explanation: ${q.explanation}`, 11, false, [100,100,100], 15);
+            if (selected === cleanedCorrect) { 
+                blockY = printWrappedText(`Your Answer: Correct`, currentX + 10, blockY, 10, true, [16, 185, 129], colWidth - 10); 
+            } else if (selected) { 
+                blockY = printWrappedText(`Your Answer: Incorrect`, currentX + 10, blockY, 10, true, [248, 81, 73], colWidth - 10); 
+                blockY = printWrappedText(`Correct Answer: ${q.correctAnswer}`, currentX + 10, blockY, 10, true, [16, 185, 129], colWidth - 10); 
+            } else { 
+                blockY = printWrappedText(`Your Answer: [Not Answered]`, currentX + 10, blockY, 10, true, [245, 158, 11], colWidth - 10); 
+                blockY = printWrappedText(`Correct Answer: ${q.correctAnswer}`, currentX + 10, blockY, 10, true, [16, 185, 129], colWidth - 10); 
+            }
+            blockY = printWrappedText(`Explanation: ${q.explanation}`, currentX + 10, blockY, 9, false, [100, 100, 100], colWidth - 10);
         }
-        currentY += 15;
+
+        // Update the Y axis pointer to sit right under this compiled block
+        currentY = blockY + 14; 
     });
 
+    // --- Dynamic Watermarks on ALL Generated Pages ---
+    const totalPages = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        
+        // 1. Center Diagonal Watermark (Light Grey background layer)
+        doc.setFontSize(65);
+        doc.setTextColor(243, 243, 246); 
+        doc.text("uRhythm", pageWidth / 2, pageHeight / 2, { align: "center", angle: 45 });
+
+        // 2. Clear Footer Identification & Hyperlink Watermark
+        doc.setFontSize(8.5);
+        doc.setTextColor(140, 140, 145);
+        const footerText = "Generated via uRhythm (urhythm.vercel.app)  |  Developer: Ujjwal Ravi (ujjwalravi.vercel.app)";
+        doc.text(footerText, pageWidth / 2, pageHeight - 20, { align: "center" });
+    }
+
+    // Save File
     const fileName = quizState.topic ? `${quizState.topic.replace(/[^a-zA-Z0-9]/g, '_')}_Quiz.pdf` : 'Quiz_Summary.pdf';
     doc.save(fileName);
     triggerHUDToast("PDF downloaded successfully.");
