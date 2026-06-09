@@ -2,17 +2,27 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>urhythm</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>uRhythm</title>
+    
+    <meta name="description" content="uRhythm is your personalized routine tracker and AI-powered quiz generator. Build daily habits and test your knowledge.">
+    <meta name="keywords" content="uRhythm, routine tracker, AI quiz generator, daily schedule, learning, productivity">
+    <meta name="author" content="Ujjwal Ravi">
+    <meta name="theme-color" content="#F2F2F7" id="theme-color-meta">
+    
+    <meta property="og:title" content="uRhythm - Routine & Learning">
+    <meta property="og:description" content="Build routines and test your knowledge with AI-generated quizzes.">
+    <meta property="og:type" content="website">
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="uRhythm">
     
     <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#000000" id="theme-color-meta">
-
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
     <link rel="stylesheet" href="styles.css">
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -22,7 +32,7 @@
     <div class="oneui-header-container">
         <div class="top-nav">
             <div>
-                <h1 id="oneui-app-title" class="oneui-main-title">Routine</h1>
+                <h1 id="oneui-app-title" class="oneui-main-title">Quiz practice</h1>
                 <div id="date-day-header" class="date-day-header"></div>
             </div>
             <div class="user-controls">
@@ -30,8 +40,8 @@
                     <div id="profile-trigger" class="profile-trigger" title="User Menu">
                         <img id="user-avatar" src="" alt="Profile" style="display: none;">
                     </div>
-                    <div id="profile-dropdown" class="action-menu-dropdown  profile-dropdown">
-                        <button id="theme-toggle-btn"><i class="fas fa-sun"></i> Theme</button>
+                    <div id="profile-dropdown" class="action-menu-dropdown profile-dropdown">
+                        <button id="theme-toggle-btn"><i class="fas fa-moon"></i> Theme</button>
                         <button id="settings-btn" style="display: none;"><i class="fas fa-key"></i> API Key</button>
                         <button id="logout-btn" class="delete-btn" style="display: none;"><i class="fas fa-sign-out-alt"></i> Logout</button>
                     </div>
@@ -46,22 +56,6 @@
             <h2 style="margin-top:0;">Welcome</h2>
             <p style="color: var(--text-muted); margin-bottom: 30px;">Sign in to sync your routines and access personalized quizzes.</p>
             <button id="google-login-btn" class="primary" style="margin: 0 auto;">Sign in with Google</button>
-        </div>
-    </div>
-
-    <div id="activity-section" class="content-section">
-        <div class="chart-container">
-            <svg id="schedule-chart" class="chart" viewBox="0 0 100 100"></svg>
-            <div id="center-activity-label" class="center-activity-label">No Active Routine</div>
-        </div>
-
-        <div class="glass-panel">
-            <div class="timeline-wrapper">
-                <div id="timeline-container"></div>
-            </div>
-            <button type="button" class="primary w-full" id="add-activity-button" style="margin: 0 auto; display: inline-flex;">
-                <i class="fas fa-plus-circle"></i> Add New Activity
-            </button>
         </div>
     </div>
 
@@ -93,6 +87,25 @@
                 <button id="downloadPdfBtn" class="secondary w-full"><i class="fas fa-file-pdf"></i> Save PDF</button>
                 <button id="resetQuizBtn" class="danger w-full">Reset</button>
             </div>
+        </div>
+    </div>
+
+    <div id="activity-section" class="content-section">
+        <div class="chart-container">
+            <svg id="schedule-chart" class="chart" viewBox="0 0 100 100"></svg>
+            <div id="center-activity-label" class="center-activity-label">No Active Routine</div>
+        </div>
+
+        <div class="glass-panel">
+            <div class="timeline-wrapper">
+                <div id="timeline-container"></div>
+            </div>
+            <button type="button" class="primary w-full" id="add-activity-button" style="margin: 0 auto; display: inline-flex;">
+                <i class="fas fa-plus-circle"></i> Add New Activity
+            </button>
+            <button type="button" class="secondary w-full" id="pwa-install-btn" style="margin: 10px auto 0; display: none;">
+                <i class="fas fa-download"></i> Install uRhythm App
+            </button>
         </div>
     </div>
 
@@ -128,7 +141,7 @@
             <h2 style="margin-top: 0; margin-bottom: 1.5rem; font-size: 1.4rem;">Setup Quiz</h2>
             <div class="form-group">
                 <label for="modalTopicInput">Quiz Topic:</label>
-                <input type="text" autocomplete="off" id="modalTopicInput" placeholder="e.g.,Histroy, Science in hindi" required>
+                <input type="text" autocomplete="off" id="modalTopicInput" placeholder="e.g.,History, Science in hindi" required>
             </div>
             <div style="display: flex; gap: 10px; margin-bottom: 1.25rem;">
                 <div class="form-group" style="flex: 1; margin: 0;">
@@ -145,7 +158,7 @@
                         <option value="5" selected>5 Questions</option>
                         <option value="10">10 Questions</option>
                         <option value="20">20 Questions</option>
-                         <option value="30">30 Questions</option>
+                        <option value="30">30 Questions</option>
                     </select>
                 </div>
             </div>
@@ -195,36 +208,29 @@
     <div id="hud-toast"></div>
 
     <div class="tab-bar-container" id="main-tabs" style="display: none;">
-        <button id="activity-tab-btn" class="tab-button active"><i class="fas fa-chart-pie"></i> Routine</button>
-        <button id="quiz-tab-btn" class="tab-button"><i class="fas fa-graduation-cap"></i> Quiz</button>
+        <button id="quiz-tab-btn" class="tab-button active"><i class="fas fa-graduation-cap"></i> Quiz</button>
+        <button id="activity-tab-btn" class="tab-button"><i class="fas fa-chart-pie"></i> Routine</button>
     </div>
     <footer>
-  <p>&copy; 2026 urhythm | Made by <a href="https://ujjwalravi.vercel.app" target="_blank" rel="noopener noreferrer">Ujjwal Ravi</a></p>
-</footer>
-
+        <p>&copy; 2026 uRhythm | Made by <a href="https://ujjwalravi.vercel.app" target="_blank" rel="noopener noreferrer">Ujjwal Ravi</a></p>
+    </footer>
 
     <script type="module" src="app.js"></script>
     <script>
+        const profileTrigger = document.getElementById('profile-trigger');
+        const profileDropdown = document.getElementById('profile-dropdown');
+        const profileWrapper = document.querySelector('.profile-menu-wrapper');
 
-        // --- Profile Dropdown Logic ---
-const profileTrigger = document.getElementById('profile-trigger');
-const profileDropdown = document.getElementById('profile-dropdown');
-const profileWrapper = document.querySelector('.profile-menu-wrapper');
+        profileTrigger.addEventListener('click', function(e) {
+            e.stopPropagation(); 
+            profileDropdown.classList.toggle('show');
+        });
 
-// Toggle dropdown when clicking the trigger
-profileTrigger.addEventListener('click', function(e) {
-    // 1. Stop the event from bubbling up to the window
-    e.stopPropagation(); 
-    profileDropdown.classList.toggle('show');
-});
-
-// Close dropdown when clicking anywhere else on the window
-window.addEventListener('click', function(e) {
-    // 2. Check if the click target is outside the wrapper
-    if (profileWrapper && !profileWrapper.contains(e.target)) {
-        profileDropdown.classList.remove('show');
-    }
-});
+        window.addEventListener('click', function(e) {
+            if (profileWrapper && !profileWrapper.contains(e.target)) {
+                profileDropdown.classList.remove('show');
+            }
+        });
     </script>
 </body>
 </html>
