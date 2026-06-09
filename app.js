@@ -48,7 +48,7 @@ function applyTheme() {
         themeMeta.setAttribute('content', '#000000');
     }
 }
-applyTheme(); // Run on load
+applyTheme(); 
 
 themeToggleBtn.addEventListener('click', () => {
     isLightMode = !isLightMode;
@@ -405,7 +405,6 @@ function updateActiveRoutineBar() {
         if(item) {
             const status = getRoutineStatus(item, currentMinutes);
             const pill = row.querySelector('.status-pill');
-            // Keep menu-open class if it exists while updating active status
             const hasMenu = row.classList.contains('menu-open') ? 'menu-open' : '';
             row.className = `timeline-row ${status === 'now' ? 'active-current' : ''} ${hasMenu}`;
             if(pill) {
@@ -464,21 +463,17 @@ function createScheduleTable() {
         const menuBtn = row.querySelector('.action-menu-btn');
         const dropdown = row.querySelector('.action-menu-dropdown');
         
-        // --- UPDATED DROPDOWN MENU LOGIC ---
         menuBtn.onclick = (e) => {
             e.stopPropagation(); 
             
-            // Remove elevated z-index from all rows
             document.querySelectorAll('.timeline-row').forEach(r => {
                 r.classList.remove('menu-open');
             });
 
-            // Close all other dropdowns
             document.querySelectorAll('.action-menu-dropdown.show').forEach(d => {
                 if (d !== dropdown) d.classList.remove('show');
             });
 
-            // Toggle this dropdown and elevate its parent row
             const isShowing = dropdown.classList.toggle('show');
             if (isShowing) {
                 row.classList.add('menu-open');
@@ -497,7 +492,7 @@ function handleArcHoverIn(e) {
     infoLabel.textContent = target.label;
     infoTime.textContent = `${formatTime(target.startH, target.startM)} - ${formatTime(target.endH, target.endM)}`;
     arcInfoTooltip.classList.add('show');
-  setTimeout(() => arcInfoTooltip.classList.remove('show'), 1500);
+    setTimeout(() => arcInfoTooltip.classList.remove('show'), 1500);
 }
 function handleArcHoverMove(e) { arcInfoTooltip.style.left = `${e.clientX}px`; arcInfoTooltip.style.top = `${e.clientY}px`; }
 function handleArcHoverOut() { arcInfoTooltip.classList.remove('show'); }
@@ -614,6 +609,7 @@ startQuizBtn.onclick = () => {
 }
 closeQuizConfigBtn.onclick = () => inputModal.classList.remove('show');
 
+// --- SECURED ROUTE TO SERVERLESS BACKEND WITH ZERO LOCAL EMBEDDED PARSING ---
 generateBtn.addEventListener('click', async () => {
     const topic = document.getElementById('modalTopicInput').value.trim();
     const difficulty = document.getElementById('modalDifficultySelect').value || 'medium';
@@ -625,43 +621,21 @@ generateBtn.addEventListener('click', async () => {
     inputModal.classList.remove('show');
     landingPage.style.display = 'none';
     loadingIndicator.style.display = 'block';
-    
-    const prompt = `Generate ${numQuestions} objective questions about "${topic}" tailored exactly to a **${difficulty}** level of difficulty. 
-Each question should have exactly 4 options (A, B, C, D), one correct answer, and a short, concise explanation. 
-Provide the output as a JSON array of objects. Each object should have 'questionText', 'options' (an array of strings), 'correctAnswer' (the exact text matches one of your options array strings), and 'explanation'.`;
-
-    const payload = {
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-            responseMimeType: "application/json",
-            responseSchema: {
-                type: "ARRAY",
-                items: {
-                    type: "OBJECT",
-                    properties: {
-                        "questionText": { "type": "STRING" },
-                        "options": { "type": "ARRAY", "items": { "type": "STRING" } },
-                        "correctAnswer": { "type": "STRING" },
-                        "explanation": { "type": "STRING" }
-                    },
-                    required: ["questionText", "options", "correctAnswer", "explanation"]
-                }
-            }
-        }
-    };
 
     try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${userGeminiApiKey}`, {
+        const response = await fetch('/api/generate-quiz', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            body: JSON.stringify({
+                topic,
+                difficulty,
+                numQuestions,
+                userApiKey: userGeminiApiKey
+            })
         });
         
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error?.message || "Failed to connect to Gemini.");
-
-        const jsonString = data.candidates[0].content.parts[0].text;
-        const result = JSON.parse(jsonString);
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "Failed to process AI response.");
 
         loadingIndicator.style.display = 'none';
 
@@ -686,7 +660,7 @@ Provide the output as a JSON array of objects. Each object should have 'question
             throw new Error("Failed to parse valid questions from AI response.");
         }
     } catch (err) {
-        console.error("Gemini Generation Error:", err);
+        console.error("Generation Processing Error:", err);
         loadingIndicator.style.display = 'none';
         quizContainer.style.display = 'block';
         quizContainer.innerHTML = `<h3 style="color:var(--danger-text); padding:20px;">Generation Error: ${err.message}</h3>`;
@@ -703,7 +677,6 @@ function renderQuizStructure() {
         
         let optionsHtml = '';
         q.options.forEach((opt) => {
-            const displayOpt = opt.trim();
             const valueOpt = cleanTextForComparison(opt);
             const isSelected = quizState.selections[idx] === valueOpt;
             const checked = isSelected ? 'checked' : '';
@@ -712,7 +685,7 @@ function renderQuizStructure() {
                 <div class="option-wrapper">
                     <label>
                         <input type="radio" name="q-${idx}" value="${valueOpt}" ${checked} ${disabled}>
-                        <span>${displayOpt}</span>
+                        <span>${opt}</span>
                     </label>
                 </div>
             `;
@@ -907,11 +880,10 @@ downloadPdfBtn.onclick = () => {
 
     quizState.activeQuestions.forEach((q, idx) => {
         checkPageBreak(40); parsePdfText(`Q${idx + 1}: ${q.questionText}`, 12, true);
-        q.options.forEach((opt) => { parsePdfText(`• ${opt.trim()}`, 11, false, null, 15); });
+        q.options.forEach((opt) => { parsePdfText(`• ${opt}`, 11, false, null, 15); });
         if(quizState.submitted) {
             const selected = quizState.selections[idx];
             const cleanedCorrect = cleanTextForComparison(q.correctAnswer);
-            const matchOpt = q.options.find(o => cleanTextForComparison(o) === selected) || selected;
             
             if (selected === cleanedCorrect) { parsePdfText(`Your Answer: Correct`, 11, true, [16, 185, 129], 15); }
             else if (selected) { parsePdfText(`Your Answer: Incorrect`, 11, true, [248, 81, 73], 15); parsePdfText(`Correct Answer: ${q.correctAnswer}`, 11, true, [16, 185, 129], 15); }
@@ -926,7 +898,7 @@ downloadPdfBtn.onclick = () => {
     triggerHUDToast("PDF downloaded successfully.");
 };
 
-// --- Init & Offline Cold-Start Simulation ---
+// --- Init ---
 document.addEventListener('DOMContentLoaded', () => {
     updateDateHeader();
     loadQuizFromLocalStorage();
@@ -952,11 +924,8 @@ document.addEventListener('DOMContentLoaded', () => {
         hideAuthenticatedUI();
     }
     
-    // --- UPDATED GLOBAL CLICK LISTENER ---
     document.addEventListener('click', () => { 
-        // Close dropdowns
         document.querySelectorAll('.action-menu-dropdown.show').forEach(d => d.classList.remove('show')); 
-        // Reset row z-indexes
         document.querySelectorAll('.timeline-row').forEach(r => r.classList.remove('menu-open'));
     });
 });
